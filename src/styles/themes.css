@@ -1,0 +1,50 @@
+/*
+File: themes.css
+Path: src/styles/themes.css
+Description: CSS variables and theme classes for AQUORIX onboarding and dashboard. Provides color, background, accent, and other tokens for .aqx-pro-dashboard-theme and .aqx-affiliate-dashboard-theme. Includes fallbacks for robust rendering.
+Author: Cascade AI
+Created: 2025-07-13
+Last Updated: 2025-07-13
+Status: In Progress
+Dependencies: Referenced by onboarding and dashboard CSS Modules.
+Notes: Expand with new tokens as needed for white-labeling, dark mode, etc.
+Change Log:
+- 2025-07-13 (Cascade): Initial creation with MVP themes and variable fallbacks.
+*/
+
+:root {
+  --font-family: 'Inter, Arial, sans-serif';
+  --font-size-base: 16px;
+  --font-size-heading: 2rem;
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+}
+
+.aqx-pro-dashboard-theme {
+  --color-primary: #0077B6;
+  --color-secondary: #00B4D8;
+  --color-accent: #FFD166;
+  --color-background: #F8F9FA;
+  --color-text: #222;
+  --color-error: #D7263D;
+  --color-success: #27AE60;
+  --color-warning: #FFA500;
+}
+
+.aqx-affiliate-dashboard-theme {
+  --color-primary: #3F704D;
+  --color-secondary: #A3B18A;
+  --color-accent: #E6C067;
+  --color-background: #F5F3E7;
+  --color-text: #2E2C1A;
+  --color-error: #B00020;
+  --color-success: #4CAF50;
+  --color-warning: #FFD700;
+}
+
+/* Example usage with fallback */
+.header {
+  color: var(--color-primary, #0077B6);
+  background: var(--color-background, #ffffff);
+  font-family: var(--font-family, Inter, Arial, sans-serif);
+}

@@ -1,0 +1,82 @@
+/* Admin Content Styles */
+.admin-content {
+  padding: 2rem;
+  background-color: #f8f9fa;
+  min-height: calc(100vh - 64px);
+}
+
+.content-header {
+  margin-bottom: 2rem;
+}
+
+.content-title {
+  color: #333;
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.content-description {
+  color: #666;
+  margin: 0.5rem 0 0;
+}
+
+/* KPI Cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.kpi-card {
+  background: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.kpi-value {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #2b7de1;
+  margin: 0 0 0.5rem;
+}
+
+.kpi-label {
+  color: #666;
+  margin: 0;
+}
+
+/* Card Containers */
+.card-container {
+  background: white;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+  color: #333;
+  font-size: 1.25rem;
+  margin: 0 0 1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .admin-content {
+    padding: 1rem;
+  }
+  
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .kpi-card {
+    padding: 1rem;
+  }
+  
+  .card-container {
+    padding: 1rem;
+  }
+}

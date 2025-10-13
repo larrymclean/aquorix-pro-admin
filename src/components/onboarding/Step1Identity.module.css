@@ -1,0 +1,343 @@
+  /*
+File: Step1Identity.module.css
+Path: src/components/onboarding/Step1Identity.module.css
+Description: Styles for Step1Identity onboarding component and Step2SelectTier. Uses AQUORIX theme tokens and CSS variables for consistent, accessible design. Includes card and session card styles for onboarding.
+Author: Cascade AI
+Created: 2025-07-13
+Last Updated: 2025-07-18
+Status: In Progress
+Dependencies: themes.css, theme.tokens.ts
+Notes: Expanded for Step 2 tier selection and card UI.
+Change Log:
+- 2025-07-13 (Cascade): Initial creation for Step 1 onboarding form.
+- 2025-07-18 (Cascade): Added Step 2 tier, card, and session card styles.
+*/
+
+.auth-container-narrow {
+  display: flex;
+  min-height: 540px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04);
+  margin: 40px auto 0;
+  max-width: 800px;
+}
+
+.authContainer {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  padding: 2rem;
+}
+
+.authContent {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  gap: 2rem;
+  max-width: 1200px;
+  width: 100%;
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+
+.authIllustration {
+  padding: 2rem;
+  background: linear-gradient(135deg, #2b7de1, #001C34);
+  border-radius: 1rem 0 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.authLogo {
+  width: 160px;
+  height: 160px;
+  margin-bottom: 1rem;
+}
+
+.authForm {
+  padding: 2rem 2rem 3.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.authHeader {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.authHeader h1 {
+  color: #2b7de1;
+  font-size: 2rem;
+  margin: 0;
+}
+
+.authHeader p {
+  color: #333;
+  margin: 0.5rem 0 0;
+  font-size: 1.1rem;
+}
+
+.authFormContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.tierContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.tierCard {
+  position: relative;
+  background: white;
+  border: 2px solid #248dc1;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.tierCard:hover,
+.tierCard:focus {
+  border-color: #00D4FF;
+  box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.25);
+  outline: none;
+}
+.selected {
+  border-color: #00D4FF;
+  box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.25);
+}
+.tierTitle {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+.tierSubtitle {
+  font-weight: 500;
+  color: #4A5C6A;
+  margin-bottom: 1rem;
+}
+.tierDesc {
+  font-size: 0.95rem;
+  color: #333;
+}
+.tierFooter {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+.tierPriceBadge {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  display: inline-block;
+  border-radius: 6px;
+  background-color: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
+}
+.free {
+  background-color: #f9f9fc;
+}
+.paid {
+  background-color: #f9f9fc;
+}
+.checkmark {
+  display: none !important;
+  width: 24px;
+  height: 24px;
+  background-color: #28a745;
+  border: 0.5px solid #1B4D6F;
+  color: white;
+  border-radius: 4px;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+  align-items: center;
+  justify-content: center;
+  margin-left: 1rem;
+  margin-bottom: 3px;
+  position: static;
+  vertical-align: middle;
+}
+.selected .checkmark {
+  display: inline-flex !important;
+}
+.authButton {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #2b7de1;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.ready {
+  background-color: #00c2f3;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+  transition: background-color 0.2s ease;
+}
+.cardSection {
+  margin-top: 2rem;
+  background: #f5f9ff;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 4px rgba(40, 125, 225, 0.08);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  width: 100%;
+  max-width: 440px;
+  font-size: 1rem;
+  color: #001C34;
+}
+.sessionCardTitle {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #2b7de1;
+}
+.sessionCardPre {
+  background: #f8f8fa;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 0.93rem;
+  color: #1B4D6F;
+  overflow-x: auto;
+  margin: 0;
+}
+
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md, 16px);
+  background: var(--color-background, #F8F9FA);
+  padding: var(--spacing-lg, 32px);
+  border-radius: var(--border-radius-md, 8px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.header {
+  font-size: var(--font-size-heading, 2rem);
+  font-family: var(--font-family, Inter, Arial, sans-serif);
+  color: var(--color-primary, #0077B6);
+  margin-bottom: var(--spacing-md, 16px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tooltip {
+  background: var(--color-accent, #FFD166);
+  color: var(--color-text, #222);
+  border-radius: 50%;
+  width: 1.5em;
+  height: 1.5em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1em;
+  cursor: pointer;
+  outline: none;
+}
+.tooltip:focus {
+  box-shadow: 0 0 0 2px var(--color-accent, #FFD166);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 1rem;
+  color: var(--color-text, #222);
+  font-weight: 600;
+}
+
+.input {
+  padding: 0.5em 1em;
+  border: var(--borders-default, 1px solid #ccc);
+  border-radius: var(--border-radius-sm, 4px);
+  font-size: 1rem;
+  font-family: var(--font-family, Inter, Arial, sans-serif);
+  background: #fff;
+  color: var(--color-text, #222);
+  transition: border 0.2s;
+}
+.input:focus {
+  border: var(--borders-focus, 2px solid #FFD166);
+  outline: none;
+}
+.input[aria-invalid="true"] {
+  border-color: var(--color-error, #D7263D);
+  background: #fff5f5;
+}
+
+
+/* Override for button height to guarantee AQUORIX visual consistency */
+.Step1Identity_nextButton {
+  background: #2b7de1 !important;
+  color: #fff !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  padding: 0.75em 2em !important;
+  border: none !important;
+  border-radius: 8px !important;
+  height: 48px !important;
+  cursor: pointer !important;
+  transition: background 0.2s, box-shadow 0.2s, opacity 0.2s !important;
+  opacity: 1 !important;
+  box-shadow: 0 2px 8px rgba(43,125,225,0.07) !important;
+}
+.Step1Identity_nextButton:hover,
+.Step1Identity_nextButton:focus {
+  background: #1760b0 !important;
+  box-shadow: 0 0 0 2px #b3d3f6 !important;
+}
+.Step1Identity_nextButton[disabled],
+.Step1Identity_nextButton[aria-disabled="true"] {
+  background: #c2d3e6 !important;
+  color: #fff !important;
+  opacity: 0.7 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--spacing-md, 16px);
+}
+
+.nextButton {
+  background: var(--color-primary, #0077B6);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.75em 2em;
+  border: none;
+  border-radius: var(--border-radius-sm, 4px);
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  opacity: 1;
+}
+.nextButton[disabled], .nextButton[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

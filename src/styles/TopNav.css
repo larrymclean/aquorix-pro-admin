@@ -1,0 +1,164 @@
+/*
+  File: TopNav.css
+  Path: src/styles/TopNav.css
+  Description: Styles for AQUORIX Admin Dashboard top navigation bar, including mobile hamburger and drawer.
+  Author: AQUORIX Engineering
+  Created: 2025-07-07
+  Last Updated: 2025-07-07
+  Status: MVP, production-ready
+  Dependencies: None
+  Notes: Hamburger only visible on mobile; drawer overlays content.
+  Change Log:
+    - 2025-07-07, AQUORIX Engineering: Add hamburger and drawer styles for mobile nav.
+*/
+
+.topnav {
+  height: 60px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: fixed;
+  left: 240px;
+  right: 0;
+  top: 0;
+  z-index: 999;
+}
+
+.nav-left {
+  display: flex;
+  align-items: center;
+}
+
+
+/* On mobile, topnav should span full width */
+@media (max-width: 600px) {
+  .topnav {
+    left: 0;
+    padding: 0 8px;
+    height: 48px;
+  }
+}
+
+
+.hamburger {
+  background: none;
+  border: none;
+  padding: 4px;
+  margin-right: 12px;
+  display: none;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+
+@media (max-width: 600px) {
+  .hamburger {
+    display: flex;
+  }
+  .topnav {
+    left: 0;
+    padding: 0 8px;
+    height: 48px;
+  }
+}
+
+.mobile-sidebar-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.25);
+  z-index: 2000;
+  display: flex;
+  align-items: flex-start;
+}
+
+.drawer-content {
+  background: #fff;
+  width: 240px;
+  max-width: 80vw;
+  min-height: 100vh;
+  box-shadow: 2px 0 12px rgba(0,0,0,0.07);
+  padding-top: 24px;
+  animation: slideInDrawer 0.2s cubic-bezier(.4,0,.2,1);
+}
+
+@keyframes slideInDrawer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+
+.nav-title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #001C34;
+  font-weight: 600;
+}
+
+.nav-left, .nav-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.nav-item {
+  color: #4B5563;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-item:hover {
+  color: #2b7de1;
+  background-color: rgba(43, 125, 225, 0.1);
+}
+
+.nav-icon {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+
+.profile-icon {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2;
+  stroke: currentColor;
+}
+
+.nav-icon:hover {
+  color: #2b7de1;
+}
+
+@media (max-width: 768px) {
+  .topnav {
+    left: 0;
+    flex-direction: column;
+    height: auto;
+    padding: 12px;
+  }
+  
+  .nav-left, .nav-right {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .nav-right {
+    margin-top: 12px;
+  }
+  
+  .nav-item {
+    font-size: 1rem;
+  }
+}

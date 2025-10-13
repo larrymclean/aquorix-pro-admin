@@ -1,0 +1,86 @@
+.gridWrapper {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e0e6ed;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.headerRow {
+  display: flex;
+  background: #f6fafd;
+  border-bottom: 1px solid #e0e6ed;
+}
+.headerCell {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+  padding: 8px 0;
+  color: #1b4d6f;
+  letter-spacing: 1px;
+  background: #f6fafd;
+}
+.weekRow {
+  display: flex;
+  min-height: 60px;
+}
+.dayCell {
+  flex: 1;
+  border-right: 1px solid #e0e6ed;
+  border-bottom: 1px solid #e0e6ed;
+  padding: 4px;
+  min-height: 60px;
+  position: relative;
+  background: #fff;
+  outline: none;
+  cursor: pointer;
+}
+.dayCell:last-child {
+  border-right: none;
+}
+.emptyCell {
+  background: #f8fafc;
+  cursor: default;
+}
+.dateNum {
+  font-size: 12px;
+  color: #888;
+  position: absolute;
+  top: 4px;
+  right: 8px;
+}
+.eventBlock {
+  background: #248dc1;
+  color: #fff;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin: 2px 0;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.eventBlock.dive {
+  background: #1b4d6f;
+}
+.eventBlock.course {
+  background: #248dc1;
+}
+.eventBlock.block {
+  background: #4a5c6a;
+}
+.eventBlock.internal {
+  background: #00d4ff;
+  color: #1b4d6f;
+}
+.eventBlock.guest {
+  background: #00bfae;
+}
+.eventTitle {
+  font-size: 13px;
+  font-weight: 500;
+}

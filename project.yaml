@@ -1,0 +1,108 @@
+# Windsurf Project Configuration for AQUORIX
+# Purpose: Provide Windsurf AI context for developing in the new dual-environment stack (PHP legacy + Node migration)
+
+project:
+  name: "AQUORIX API & Pro Dashboard"
+  description: |
+    AQUORIX is a multi-tiered platform for dive professionals, operators, and affiliates.
+    It currently runs on a mixed stack:
+      - Legacy PHP endpoints (MAMP/Bluehost) for APIs and widgets
+      - Supabase for authentication and initial user onboarding
+      - PostgreSQL backend for advanced features (bookings, schedules, inventory)
+      - React (Next.js) for modern widgets and dashboards
+    The goal: Align Supabase and AQUORIX backend in parallel during onboarding and migrate legacy PHP APIs to Node.
+
+environments:
+  development:
+    description: "Local dev on iMac using MAMP + React local servers"
+    servers:
+      - name: "Legacy PHP API"
+        url: "http://localhost:8888/api.aquorix.com"
+        notes: "MAMP-based dev server for legacy endpoints"
+      - name: "Pro Dashboard (React)"
+        url: "http://localhost:3007"
+        notes: "React-based Pro Dashboard (blue side nav)"
+      - name: "Backend API (Node planned)"
+        url: "http://localhost:4000"
+        notes: "Future Express API server for v2 endpoints"
+    databases:
+      - name: "aquorix"
+        type: "PostgreSQL"
+        host: "localhost"
+        notes: "Primary backend DB for Island Mode + API features"
+    auth:
+      type: "Supabase"
+      notes: "Used for JWT-based authentication and onboarding (email/password, invitations)"
+
+  production:
+    description: "Live AQUORIX environment"
+    servers:
+      - name: "Pro Dashboard"
+        url: "https://app.aquorix.com"
+      - name: "API"
+        url: "https://api.aquorix.com"
+      - name: "Widgets"
+        url: "https://aquorix.app"
+    databases:
+      - name: "aquorix"
+        type: "PostgreSQL"
+        host: "prod-db.aquorix.com"
+    auth:
+      type: "Supabase"
+      notes: "Production Supabase project for auth and profile metadata"
+
+onboarding:
+  flow_description: |
+    The onboarding process now updates both Supabase (for authentication) and the AQUORIX PostgreSQL backend (for API-driven features).
+    Steps:
+      1. Supabase invitation → User sets password
+      2. Step 1 (Identity): First/last name, phone, country
+      3. Step 2 (Tier Selection): User selects Tier 1–5
+      4. Step 3 (Business/Professional Details): Logo upload (Supabase Storage), operator or affiliate data if applicable
+      5. Step 4 (Confirmation): Data syncs with both Supabase and PostgreSQL.
+    All onboarding data is now mirrored between Supabase (auth) and PostgreSQL (operational data).
+
+api:
+  versioning:
+    - v1: "Legacy PHP endpoints"
+    - v2: "Planned Node.js (Express) endpoints"
+  sample_endpoints:
+    - path: "/v1/schedules/:operator"
+      description: "Returns dive schedule for a given operator"
+      format: |
+        {
+          "schedule": [
+            {
+              "time": "09:00",
+              "days": {
+                "Sunday": "Barge Wreck",
+                "Monday": "Rainbow Reef",
+                "Tuesday": "Japanese Garden"
+              }
+            }
+          ]
+        }
+
+cors:
+  description: "Dynamic CORS handling based on environment"
+  dev: "Auto-allow localhost:8888 and local React servers"
+  prod: "Restrict to *.aquorix.com domains"
+  config_file: "/api.aquorix.com/config.php"
+
+migration:
+  goals: |
+    - Transition legacy PHP APIs to Node.js (Express) with PostgreSQL connections
+    - Maintain API versioning (/v1 = PHP, /v2 = Node)
+    - Migrate widgets to React for embed-friendly schedules and bookings
+    - Ensure Supabase auth IDs are mapped to PostgreSQL users for Island Mode
+  next_steps:
+    - Scaffold Express API with `/api/v2/schedules/:operator`
+    - Implement shared `cors.js` for Node
+    - Connect PostgreSQL to Node API (replace hardcoded PHP data)
+    - Build React components for schedules/bookings widgets
+
+notes:
+  - "Keep `/api.aquorix.com/docs/README.md` updated with developer guidance"
+  - "Track test data with `is_test` flag + `test_entities` table for cleanup"
+  - "Prepare for PWA + Island Mode (offline-ready Node API + Supabase sync)"
+                                                                                                                                                                                                                

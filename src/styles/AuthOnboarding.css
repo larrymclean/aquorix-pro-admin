@@ -1,0 +1,256 @@
+/*
+File: AuthOnboarding.css
+Path: src/styles/AuthOnboarding.css
+Description: Canonical styles for AQUORIX onboarding/auth flows, based on MVP prototype. Includes password visibility toggle and password strength meter support.
+Author: Cascade AI
+Created: 2025-07-14
+Last Updated: 2025-07-14
+Status: Active
+Dependencies: N/A
+Notes: Use for all onboarding and authentication pages. Responsive and accessible. See audit and design docs for details.
+Change Log:
+- 2025-07-14 (Cascade): Initial creation, migrated from MVP Auth.css and updated for onboarding flows.
+*/
+
+:root {
+  --primary-color: #2b7de1;
+  --secondary-color: #001C34;
+  --text-color: #333;
+  --error-color: #dc3545;
+  --success-color: #28a745;
+  --spacing: 1rem;
+}
+
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  padding: 2rem;
+}
+
+.auth-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  max-width: 1200px;
+  width: 100%;
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
+}
+
+.auth-illustration {
+  padding: 2rem;
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  border-radius: 1rem 0 0 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-form {
+  padding: 2rem 2rem 3.5rem 2rem; /* Increased bottom padding for breathing room */
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+/* 2025-07-15 (Cascade): Increased bottom padding for .auth-form for better spacing. */
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.auth-logo {
+  width: 160px;
+  height: 160px;
+  margin-bottom: 1rem;
+}
+
+.auth-header h1 {
+  color: var(--primary-color);
+  font-size: 2rem;
+  margin: 0;
+}
+
+.auth-header p {
+  color: var(--text-color);
+  margin: 0.5rem 0 0;
+  font-size: 1.1rem;
+}
+
+.auth-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  position: relative;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.form-group input.error {
+  border-color: var(--error-color);
+}
+
+.error-message {
+  position: absolute;
+  bottom: -1.5rem;
+  left: 0;
+  color: var(--error-color);
+  font-size: 0.875rem;
+}
+
+.password-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-toggle {
+  margin-left: -40px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  width: 32px;
+  z-index: 2;
+  position: relative;
+}
+
+.password-toggle svg {
+  display: block;
+  height: 1.5em;
+  width: 1.5em;
+  margin: 0 auto;
+  vertical-align: middle;
+}
+
+.password-strength {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.strength-level {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.strength-level.weak {
+  background-color: #ffebee;
+  color: #f44336;
+}
+
+.strength-level.medium {
+  background-color: #fff3cd;
+  color: #f57f17;
+}
+
+.strength-level.strong {
+  background-color: #e8f5e9;
+  color: #4caf50;
+}
+
+.auth-button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.auth-button:hover:not(:disabled) {
+  background-color: #2366b7;
+}
+
+.auth-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-color);
+}
+
+.forgot-password {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
+.auth-footer {
+  text-align: center;
+}
+
+.auth-footer p {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 0.875rem;
+}
+
+.auth-footer a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .auth-content {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .auth-illustration {
+    display: none;
+  }
+
+  .auth-form {
+    padding: 1.5rem;
+  }
+}
