@@ -1,3 +1,42 @@
+# AQUORIX Pro Admin – Dashboard Prototype
+
+Project: AQUORIX Pro Admin Dashboard (React)  
+Version: v0.1.0-dashboard-proto (recovered)  
+Environment: Node + React + React Router  
+Status: Recovery in progress (25 Nov 2025)
+
+This repository contains the recovered AQUORIX Pro Admin dashboard shell, including:
+
+- Admin layout (sidebar + top nav + content)
+- Pro Dashboard placeholder page (wired to Supabase-backed backend)
+- Partner/Affiliate dashboard placeholder (Tier 5)
+- Theme provider + tier-based theme selection
+
+It is the canonical reference for the next iteration of the AQUORIX Pro Dashboard, which will later integrate the Booking/Scheduler v3 module.
+
+---
+
+## 📁 Directory Structure (Key Files)
+
+```text
+aquorix-pro-admin/
+  src/
+    layouts/
+      AQXAdminLayout.tsx        # Main admin layout shell (sidebar + top nav + content)
+    pages/
+      DashboardPlaceholder.tsx  # Pro dashboard entry screen (tier + onboarding status)
+      PartnerDashboardPlaceholder.tsx  # Partner/affiliate (Tier 5) dashboard placeholder
+    components/
+      SidebarNavigation.tsx     # Admin sidebar navigation
+      TopNav.tsx                # Top navigation bar
+      AdminContent.tsx          # Routes/content area for main admin pages
+      ThemeProvider.tsx         # Theme context for admin UI
+      UserContext.tsx           # User/tier context (used by layout)
+    theme.config.ts             # Theme definitions & getThemeByTier(tier)
+    styles/
+      AQXAdmin.css              # Core admin layout styling (sidebar + content)
+      TopNav.css                # Top nav styling
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).

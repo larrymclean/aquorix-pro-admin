@@ -1,0 +1,122 @@
+:root {
+  --aqx-primary: #2b7de1;
+  --aqx-primary-hover: #1a8cc7;
+  --aqx-primary-light: #2bb3f4;
+
+  --aqx-slate: #4a5c6a;
+  --aqx-slate-light: #6b7c8a;
+  --aqx-background: #f5f6f5;
+
+  --aqx-input-bg: #f9fbfc;
+  --aqx-input-border: #dbe4ea;
+
+  --sidebar-bg: #e8f4f8;
+  --topnav-bg: #ffffff;
+  --topnav-border: #e0e0e0;
+  --card-bg: #ffffff;
+  --card-shadow: 0 2px 8px rgba(43, 125, 225, 0.06);
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+}
+
+:root {
+  --aqx-blue: var(--aqx-primary);
+  --aqx-aqua: var(--aqx-primary-light);
+  --aqx-light-cobalt: var(--aqx-primary-hover);
+  --aqx-slate-gray: var(--aqx-slate);
+  --aqx-pearl-white: var(--aqx-background);
+}
+
+.aqx-pro-dashboard-theme {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
+    sans-serif;
+  background-color: var(--aqx-background);
+  color: var(--aqx-slate);
+}
+
+/* Layout */
+.aqx-theme-dive-locker .aqx-dashboard-root {
+  display: flex;
+  height: 100vh;
+  background-color: var(--aqx-background);
+}
+
+.aqx-theme-dive-locker .aqx-sidebar {
+  width: 240px;
+  background-color: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.aqx-theme-dive-locker .aqx-right-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.aqx-theme-dive-locker .aqx-topnav {
+  height: 64px;
+  background-color: var(--topnav-bg);
+  border-bottom: 1px solid var(--topnav-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+
+.aqx-theme-dive-locker .aqx-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background-color: var(--aqx-background);
+}
+
+.aqx-theme-dive-locker .aqx-card {
+  background-color: var(--card-bg);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+}
+
+/* Active nav item */
+.aqx-theme-dive-locker .sidebar-item--active {
+  background: rgba(43, 125, 225, 0.1);
+  color: var(--aqx-primary);
+  border-left: 3px solid var(--aqx-primary-light);
+}
+
+/* Buttons */
+.aqx-btn-primary {
+  background-color: var(--aqx-primary);
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 0 24px;
+  min-height: 40px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.aqx-btn-primary:hover {
+  background-color: var(--aqx-primary-hover);
+}
+
+.aqx-btn-secondary {
+  border: 1px solid var(--aqx-primary);
+  background: transparent;
+  color: var(--aqx-primary);
+  border-radius: 6px;
+  padding: 0 16px;
+  min-height: 36px;
+  font-weight: 500;
+}
+
+/* Focus */
+.aqx-pro-dashboard-theme button:focus-visible,
+.aqx-pro-dashboard-theme a:focus-visible {
+  outline: 2px solid var(--aqx-primary-light);
+  outline-offset: 2px;
+}

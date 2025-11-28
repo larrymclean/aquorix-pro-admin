@@ -3,8 +3,10 @@
  Path: src/App.tsx
  Description: Main entry for AQUORIX Pro/Admin Dashboard. Sets up routing and authentication guards for all app routes.
  Author: AQUORIX Engineering
+ Version:1.3.0
  Created: 2025-07-07
  Last Updated: 2025-09-14
+ Last Updated: 2025-11-28
  Status: Production, RBAC refactored
  Dependencies: React, React Router DOM, useAquorixUser
  Notes: Debug banner removed for production cleanup. Uses AQUORIX backend for all RBAC and dashboard context.
@@ -15,7 +17,9 @@
  - 2025-07-11, AQUORIX Engineering: Update dashboard route guard to allow all eligible roles, add NotAuthorized route.
  - 2025-09-07, Removed Dashboard placeholder text, added import for dash test page
  - 2025-09-14, AQUORIX Engineering: Added Outlet import and fixed admin route RequireAuth wrapper to include children element.
+ - 2025-11-28, Adde routs for ProDashboardMock
 */
+
 import React from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import AQXAdminLayout from './layouts/AQXAdminLayout';
@@ -29,8 +33,7 @@ import SystemHealth from './pages/admin/SystemHealth';
 import { SystemHealthLogProvider } from './context/SystemHealthLogContext';
 import './styles/AQXAdmin.css';
 import DashboardPlaceholder from './pages/DashboardPlaceholder';
-
-console.log('App.tsx rendered');
+import { ProDashboardMock } from './features/dashboard/ProDashboardMock';
 
 function App() {
   // DEBUG: Confirm running source
@@ -55,15 +58,10 @@ function App() {
           <Route path="/admin/system-health" element={<SystemHealth />} />
         </Route>
         
-        {/* Dashboard - protected, only authorized roles/tiers */}
-        <Route
-          path="/dashboard/*"
-          element={
-            <RequireAuth allowedRoles={['user', 'admin']} allowedTiers={['solo', 'entrepreneur', 'dive_center', 'complex', 'affiliate']}>
-              <DashboardPlaceholder />
-            </RequireAuth>
-          }
-        />
+        {/* Dashboard – temporarily public for UI build */}
+        <Route path="/dashboard/*" element={<ProDashboardMock />} />
+
+        
         
         {/* Not Authorized route */}
         <Route path="/not-authorized" element={React.createElement(require('./pages/NotAuthorized').default)} />

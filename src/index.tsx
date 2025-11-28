@@ -5,6 +5,7 @@ import './styles/AQXAdmin.css';
 import './styles/TopNav.css';
 import './styles/aqx-unified-style-guide.css';
 import './styles/AuthOnboarding.css';
+import './styles/dashboard.css';
 import App from './App';
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
