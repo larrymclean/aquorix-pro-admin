@@ -1,55 +1,102 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-
-type Tier = 1 | 2 | 3;
+import {
+  Home,
+  Calendar,
+  ClipboardList,
+  Users,
+  Waves,
+  Ship,
+  BarChart2,
+  DollarSign,
+  Settings,
+  PanelLeftClose,
+} from 'lucide-react';
 
 interface SidebarProps {
-  tier: Tier;
+  isCollapsed: boolean;
+  onToggle: () => void;
 }
 
-interface NavItem {
-  path: string;
-  label: string;
-  tiers: Tier[];
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { path: '/dashboard', label: 'Overview', tiers: [1, 2, 3] },
-  { path: '/dashboard/schedule', label: 'Schedule', tiers: [1, 2, 3] },
-  { path: '/dashboard/settings', label: 'Settings', tiers: [1, 2, 3] },
+const navItems = [
+  { to: '/dashboard', label: 'Overview', icon: Home },
+  { to: '/dashboard/schedule', label: 'Schedule', icon: Calendar },
+  { to: '/dashboard/bookings', label: 'Bookings', icon: ClipboardList },
+  { to: '/dashboard/team', label: 'Team', icon: Users },
+  { to: '/dashboard/sites', label: 'Dive Sites', icon: Waves },
+  { to: '/dashboard/fleet', label: 'Fleet', icon: Ship },
+  { to: '/dashboard/reports', label: 'Reports', icon: BarChart2 },
+  { to: '/dashboard/payments', label: 'Payments', icon: DollarSign },
 ];
 
-export const Sidebar: React.FC<SidebarProps> = ({ tier }) => {
-  const items = NAV_ITEMS.filter((item) => item.tiers.includes(tier));
-
+const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
   return (
-    <aside className="aqx-sidebar">
-      <div style={{ padding: '16px' }}>
-        <div style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--aqx-slate-light)', letterSpacing: '0.12em' }}>
-          Aquorix
-        </div>
-        <div style={{ fontWeight: 600, marginTop: 4 }}>Pro Dashboard</div>
-      </div>
-      <nav style={{ padding: '8px 0' }}>
-        {items.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              'sidebar-item ' + (isActive ? 'sidebar-item--active' : '')
-            }
-            style={{
-              display: 'block',
-              padding: '8px 20px',
-              textDecoration: 'none',
-              color: 'var(--aqx-slate)',
-              fontSize: 14,
-            }}
-          >
-            {item.label}
-          </NavLink>
-        ))}
+    <>
+      <nav className="aqx-sidebar-nav">
+        {navItems.map(item => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/dashboard'}
+              className={({ isActive }) =>
+                [
+                  'sidebar-item',
+                  isActive ? 'sidebar-item--active' : '',
+                ]
+                  .join(' ')
+                  .trim()
+              }
+            >
+              <Icon />
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
+
+        {/* Settings */}
+        <NavLink
+          to="/dashboard/settings"
+          className={({ isActive }) =>
+            [
+              'sidebar-item',
+              isActive ? 'sidebar-item--active' : '',
+            ]
+              .join(' ')
+              .trim()
+          }
+        >
+          <Settings />
+          <span>Settings</span>
+        </NavLink>
+
+        {/* Toggle under Settings */}
+        <button
+          type="button"
+          id="aqx-sidebar-toggle"
+          className="aqx-sidebar-toggle"
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={onToggle}
+        >
+          <PanelLeftClose />
+        </button>
       </nav>
-    </aside>
+
+      <div className="aqx-sidebar-footer">
+        <div className="aqx-sidebar-brand">
+          <img
+            src="/nautilus-icon.png"
+            alt="AQUORIX icon"
+            className="aqx-brand-icon"
+          />
+          <span>AQUORIX</span>
+        </div>
+        <div className="aqx-sidebar-tagline">Command the Depths ™</div>
+        <div className="aqx-sidebar-version">Version: 1.0.0</div>
+      </div>
+    </>
   );
 };
+
+export default Sidebar;

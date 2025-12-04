@@ -1,20 +1,39 @@
 import React from 'react';
+import { Bell, HelpCircle, User as UserIcon } from 'lucide-react';
+import { MOCK_DASHBOARD_OVERVIEW } from '../mockData';
 
-interface TopNavProps {
-  operatorName: string;
-}
+const TopNav: React.FC = () => {
+  const { operator } = MOCK_DASHBOARD_OVERVIEW;
 
-export const TopNav: React.FC<TopNavProps> = ({ operatorName }) => {
   return (
-    <header className="aqx-topnav">
-      <div>
-        <div style={{ fontSize: 12, color: 'var(--aqx-slate-light)' }}>Operator</div>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>{operatorName}</div>
+    <>
+      <div className="aqx-topnav-left">
+        <div className="aqx-topnav-logo">
+          <img
+            src={operator.logoUrl ?? '/operator-logo.png'}
+            alt={`${operator.name} logo`}
+          />
+        </div>
+        <div className="aqx-topnav-operator-block">
+          <div className="aqx-topnav-label">Operator</div>
+          <div className="aqx-topnav-operator-name">{operator.name}</div>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <button className="aqx-btn-secondary">Alerts</button>
-        <button className="aqx-btn-primary">Profile</button>
+
+      <div className="aqx-topnav-actions">
+        <button className="aqx-btn-icon" aria-label="Notifications">
+          <Bell />
+        </button>
+        <button className="aqx-btn-icon" aria-label="Help">
+          <HelpCircle />
+        </button>
+        <button className="aqx-btn-primary">
+          <UserIcon />
+          <span>Profile</span>
+        </button>
       </div>
-    </header>
+    </>
   );
 };
+
+export default TopNav;

@@ -1,54 +1,79 @@
 import React from 'react';
-import { ProDashboardShell } from './ProDashboardShell';
-import { MetricCard } from './components/MetricCard';
+import {
+  CalendarCheck,
+  Waves,
+  Users as UsersIcon,
+  Calendar as CalendarIcon,
+} from 'lucide-react';
+import { MOCK_DASHBOARD_OVERVIEW } from './mockData';
 
-export const ProDashboardMock: React.FC = () => {
-  // TODO: Replace hard-coded tier/operatorName with GET /api/v3/users/me
-  const tier: 1 | 2 | 3 = 2;
-  const operatorName = 'Stonefish Diving · Aqaba';
-
-  // TODO: Replace mock metrics with GET /api/v3/metrics/dashboard-summary
-  const metrics = {
-    upcomingBookings: 12,
-    divesToday: 3,
-    uniqueDiversThisWeek: 18,
-  };
+const ProDashboardMock: React.FC = () => {
+  const { metrics } = MOCK_DASHBOARD_OVERVIEW;
 
   return (
-    <ProDashboardShell tier={tier} operatorName={operatorName}>
-      <div style={{ maxWidth: 1120, margin: '0 auto' }}>
-        <div style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 4 }}>Dashboard</h1>
-          <p style={{ fontSize: 14, color: 'var(--aqx-slate-light)' }}>
-            Welcome back. Here’s what’s happening in your operation.
-          </p>
+    <div className="aqx-main-inner">
+      <div className="aqx-main-header">
+        <h1>Pro Dashboard</h1>
+        <p>Welcome back. Here’s what’s happening in your operation today.</p>
+      </div>
+
+      {/* METRIC CARDS */}
+      <div className="aqx-metric-grid">
+        {/* Upcoming bookings */}
+        <div className="aqx-card aqx-metric-card">
+          <div className="aqx-metric-header">
+            <div className="aqx-metric-title">Upcoming bookings</div>
+            <div className="aqx-metric-icon-pill">
+              <CalendarCheck />
+            </div>
+          </div>
+          <div className="aqx-metric-value">{metrics.upcomingBookings7d}</div>
+          <div className="aqx-metric-subtitle">Next 7 days</div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
-          <MetricCard
-            title="Upcoming Bookings"
-            value={metrics.upcomingBookings}
-            subtitle="Next 7 days"
-          />
-          <MetricCard
-            title="Dives Today"
-            value={metrics.divesToday}
-            subtitle="Scheduled"
-          />
-          <MetricCard
-            title="Unique Divers"
-            value={metrics.uniqueDiversThisWeek}
-            subtitle="This week"
-          />
+        {/* Dives today */}
+        <div className="aqx-card aqx-metric-card">
+          <div className="aqx-metric-header">
+            <div className="aqx-metric-title">Dives today</div>
+            <div className="aqx-metric-icon-pill">
+              <Waves />
+            </div>
+          </div>
+          <div className="aqx-metric-value">{metrics.divesToday}</div>
+          <div className="aqx-metric-subtitle">Scheduled</div>
         </div>
 
-        <div className="aqx-card" style={{ padding: 16 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Today’s Schedule</h2>
-          <p style={{ fontSize: 14, color: 'var(--aqx-slate-light)' }}>
-            Schedule widget will be integrated here via /api/v3/booking/schedules/:operatorId.
-          </p>
+        {/* Unique divers this week */}
+        <div className="aqx-card aqx-metric-card">
+          <div className="aqx-metric-header">
+            <div className="aqx-metric-title">Unique divers</div>
+            <div className="aqx-metric-icon-pill">
+              <UsersIcon />
+            </div>
+          </div>
+          <div className="aqx-metric-value">{metrics.uniqueDiversThisWeek}</div>
+          <div className="aqx-metric-subtitle">This week</div>
         </div>
       </div>
-    </ProDashboardShell>
+
+      {/* SCHEDULE CARD */}
+      <div className="aqx-card aqx-schedule-card">
+        <div className="aqx-schedule-header">
+          <div className="aqx-schedule-title">Today’s Schedule</div>
+          <button className="aqx-btn-secondary">
+            <CalendarIcon />
+            <span>View full calendar</span>
+          </button>
+        </div>
+        <div className="aqx-schedule-body">
+          This is a placeholder. In the live app, this panel will render the
+          <span> next departures, call times, and roster counts</span> from
+          <code> /api/v3/booking/schedules/:operatorId</code>. Use this mock to
+          refine spacing, typography, and card behavior before wiring real data.
+        </div>
+      </div>
+    </div>
   );
 };
+
+export default ProDashboardMock;
