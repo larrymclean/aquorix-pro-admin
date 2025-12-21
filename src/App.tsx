@@ -17,7 +17,8 @@
  - 2025-07-11, AQUORIX Engineering: Update dashboard route guard to allow all eligible roles, add NotAuthorized route.
  - 2025-09-07, Removed Dashboard placeholder text, added import for dash test page
  - 2025-09-14, AQUORIX Engineering: Added Outlet import and fixed admin route RequireAuth wrapper to include children element.
- - 2025-11-28, Adde routs for ProDashboardMock
+ - 2025-11-28, Added routes for ProDashboardMock
+ - 2025-12-04, Modified for new Pro Dashboard MVP v 1.1.3
 */
 
 import React from 'react';
@@ -33,7 +34,9 @@ import SystemHealth from './pages/admin/SystemHealth';
 import { SystemHealthLogProvider } from './context/SystemHealthLogContext';
 import './styles/AQXAdmin.css';
 import DashboardPlaceholder from './pages/DashboardPlaceholder';
-import { ProDashboardMock } from './features/dashboard/ProDashboardMock';
+import ProDashboardShell from './features/dashboard/ProDashboardShell';
+import ProDashboardMock from './features/dashboard/ProDashboardMock';
+import SchedulePage from './features/dashboard/pages/SchedulePage';
 
 function App() {
   // DEBUG: Confirm running source
@@ -59,9 +62,10 @@ function App() {
         </Route>
         
         {/* Dashboard – temporarily public for UI build */}
-        <Route path="/dashboard/*" element={<ProDashboardMock />} />
-
-        
+        <Route path="/dashboard" element={<ProDashboardShell />}>
+          <Route index element={<ProDashboardMock />} />
+          <Route path="schedule" element={<SchedulePage />} />
+        </Route>
         
         {/* Not Authorized route */}
         <Route path="/not-authorized" element={React.createElement(require('./pages/NotAuthorized').default)} />
