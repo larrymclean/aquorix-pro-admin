@@ -1,15 +1,43 @@
 /**
  * ============================================================================
- * AQUORIX Pro Dashboard - Schedule Page (Phase A)
+ * AQUORIX Pro Dashboard — Schedule Page (Phase A → Phase C Bridge)
  * ============================================================================
- * File: src/features/dashboard/pages/SchedulePage.tsx
+ * File:        src/features/dashboard/pages/SchedulePage.tsx
+ * Owner:       LSM (Larry McLean)
+ * Created:     12-20-25
+ *
  * Purpose:
  *   - Fetch and render live schedule data from Scheduler API v1.2.0
- *   - MVP: Today view (primary) + Week view (secondary)
- * Version: 0.1.0
- * Notes:
- *   - Phase A uses dev bridge operator_id=143 (Blue Current) until Phase B
- *   - Shows loading/error states and capacity warnings
+ *   - Provide MVP Schedule views:
+ *       (1) Today view (primary)
+ *       (2) Week view (secondary)
+ *
+ * What This Page Does (MVP Behavior):
+ *   - Calls Scheduler API endpoints:
+ *       GET /api/v1/operators/:operatorId/schedule/today
+ *       GET /api/v1/operators/:operatorId/schedule/week?start_date=YYYY-MM-DD
+ *   - Renders schedule “cards” for each session returned (site, times, type, capacity)
+ *   - Shows loading + error + empty states
+ *   - Highlights capacity risk for vessel-limited sessions
+ *
+ * Operator Resolution (Phase C Bridge — NO HARD-CODE IN UI):
+ *   - Operator ID is resolved in this order:
+ *       1) localStorage AQX_OPERATOR_ID (dev override)
+ *       2) DEFAULT_OPERATOR_ID fallback (143)
+ *   - This keeps Phase A compatibility while enabling data-driven testing.
+ *
+ * Notes / Constraints:
+ *   - Phase A seeded data targets operator_id=143 (“Blue Current”) as the dev bridge.
+ *   - Week view uses a stable seeded start_date: 2025-12-20 (until Phase B logic).
+ *   - This page is intentionally simple and self-contained to prevent drift.
+ *
+ * Change Log (NEVER DELETE ENTRIES — APPEND ONLY):
+ *   - 12-20-25 — v0.1.0 — Initial SchedulePage scaffold:
+ *       - Today/Week tabs, fetch wiring, card rendering, loading/error/empty states.
+ *   - 12-23-25 — v0.1.1 — Phase C Bridge: operatorId de-hardcode + runtime stability:
+ *       - Added operatorId resolver (localStorage AQX_OPERATOR_ID → fallback 143).
+ *       - Updated fetch URLs to use resolved operatorId (Today + Week).
+ *       - Confirmed UI success: schedule renders at /dashboard/schedule with week cards.
  * ============================================================================
  */
 
@@ -47,7 +75,18 @@ type ScheduleResponse = {
 };
 
 const API_BASE = 'http://localhost:3001';
-const DEV_OPERATOR_ID = 143;
+
+// Phase C Data Driven Update
+const DEFAULT_OPERATOR_ID = 143;
+
+function resolveOperatorId(): number {
+  // 1) Browser override (fastest dev path)
+  const fromStorage = Number(localStorage.getItem('AQX_OPERATOR_ID'));
+  if (Number.isFinite(fromStorage) && fromStorage > 0) return fromStorage;
+
+  // 2) Fallback
+  return DEFAULT_OPERATOR_ID;
+}
 
 function fmtLocal(dt: string | null): string {
   if (!dt) return '—';
@@ -77,6 +116,7 @@ function CapacityLine({ c }: { c: Capacity }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [data, setData] = useState<ScheduleResponse | null>(null);
+  const operatorId = useMemo(() => resolveOperatorId(), []);
 
   const weekStartDate = useMemo(() => {
     // Phase A: hardcode a stable seeded date if needed; otherwise “today” in local timezone is fine.
@@ -92,8 +132,8 @@ function CapacityLine({ c }: { c: Capacity }) {
     try {
       const url =
         tab === 'today'
-          ? `${API_BASE}/api/v1/operators/${DEV_OPERATOR_ID}/schedule/today`
-          : `${API_BASE}/api/v1/operators/${DEV_OPERATOR_ID}/schedule/week?start_date=${weekStartDate}`;
+          ? `${API_BASE}/api/v1/operators/${operatorId}/schedule/today`
+          : `${API_BASE}/api/v1/operators/${operatorId}/schedule/week?start_date=${weekStartDate}`;
 
       const res = await fetch(url, {
         method: 'GET',
@@ -125,7 +165,7 @@ function CapacityLine({ c }: { c: Capacity }) {
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Schedule</div>
           <div style={{ opacity: 0.75, fontSize: 13 }}>
-            Live Scheduler API (v1.2.0) • Operator {DEV_OPERATOR_ID} • {data?.timezone || '…'}
+            Live Scheduler API (v1.2.0) • Operator {operatorId} • {data?.timezone || '…'}
           </div>
         </div>
 
