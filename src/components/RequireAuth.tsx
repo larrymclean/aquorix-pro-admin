@@ -1,133 +1,389 @@
 /*
-  File: RequireAuth.tsx
-  Path: src/components/RequireAuth.tsx
-  Description: Updated to use AQUORIX backend for user role/tier authorization
-  Author: AQUORIX Engineering
-  Created: 2025-09-14
-  Status: Updated to use AQUORIX API
-*/
+ * ============================================================================
+ * File:        RequireAuth.tsx
+ * Path:        src/components/RequireAuth.tsx
+ * Project:     AQUORIX Pro Dashboard
+ * ============================================================================
+ * Description:
+ *   Route guard component for AQUORIX Pro Dashboard.
+ *
+ *   This implementation:
+ *   - Validates authentication via Supabase session
+ *   - Delegates ALL routing authority to backend /api/v1/me
+ *   - Uses /api/v1/me as the single source of truth for:
+ *       - Identity (supabase_user_id, email)
+ *       - AQUORIX user presence (aquorix_user.user_id)
+ *       - Tier (aquorix_user.tier)
+ *       - Operator affiliation (operator.affiliation)
+ *       - Onboarding routing (routing_hint)
+ *   - Preserves optional gating:
+ *       - allowedRoles = operator affiliation values (e.g. "owner" | "admin" | "staff")
+ *       - allowedTiers = AQUORIX tier enum values (e.g. "solo", "dive_center", etc.)
+ *
+ * Architectural Rule:
+ *   Frontend does NOT infer onboarding vs dashboard state.
+ *   Backend (/api/v1/me) is the single source of truth.
+ *
+ * Author:      AQUORIX Engineering
+ * Created:     2025-09-14
+ *
+ * Change Log (append-only):
+ * --------------------------------------------------------------------------
+ * v1.0.0  2025-09-14  AQUORIX Engineering
+ *   - Initial RequireAuth implementation
+ *   - Supabase session check + backend lookup (legacy)
+ *
+ * v1.1.0  2025-12-25  Larry McLean
+ *   - Replace legacy lookup with /api/v1/me (routing authority)
+ *   - Attach Bearer token to /me request (no querystring user_id)
+ *   - Normalize role/tier from /me payload (enum-safe)
+ *   - Fix redirect behavior: return <Navigate /> ONLY at component root
+ *   - Use useNavigate for user-initiated actions (buttons)
+ *   - Fetch /me once on mount (constraints do not trigger refetch)
+ *   - Add clear backend-down state (do not mask as onboarding)
+ *   - Professional logging output (no emoji)
+ * ============================================================================
+ */
 
-import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
 interface RequireAuthProps {
   children: React.ReactNode;
-  allowedRoles?: string[];
-  allowedTiers?: string[];
+  allowedRoles?: string[]; // NOTE: treated as operator affiliation (owner/admin/staff) for MVP
+  allowedTiers?: string[]; // NOTE: treated as aquorix_user.tier values
 }
 
-interface AquorixUser {
-  user_id: string;
-  email: string;
-  role: string;
-  tier: string;
+interface AquorixAuthContext {
+  supabase_user_id: string | null;
+  email: string | null;
+
+  // AQUORIX DB user identity
+  user_id: string | null;
+  tier: string | null;
+
+  // Derived from operator affiliation (MVP semantics)
+  role: string | null;
+
+  // Future-proof: currently default true unless backend adds explicit flag
   is_active: boolean;
+
+  routing_hint: 'dashboard' | 'onboarding' | 'login' | null;
 }
 
-const RequireAuth: React.FC<RequireAuthProps> = ({ 
-  children, 
-  allowedRoles = [], 
-  allowedTiers = [] 
+type MeResponse =
+  | {
+      ok: true;
+      authenticated: true;
+      identity?: { supabase_user_id?: string; email?: string };
+      aquorix_user?: { user_id?: string; tier?: string };
+      operator?: { affiliation?: string | null };
+      onboarding?: { is_complete?: boolean };
+      routing_hint?: string;
+    }
+  | {
+      ok: false;
+      error?: string;
+      message?: string;
+      routing_hint?: string;
+      identity?: { supabase_user_id?: string; email?: string };
+    };
+
+const ME_URL = 'http://localhost:3001/api/v1/me';
+
+type AuthErrorType =
+  | 'NO_SESSION'
+  | 'ME_UNAUTHORIZED'
+  | 'ME_BACKEND_DOWN'
+  | 'AQUORIX_USER_MISSING'
+  | 'INACTIVE'
+  | 'ROLE_DENIED'
+  | 'TIER_DENIED'
+  | null;
+
+interface AuthErrorState {
+  type: AuthErrorType;
+  message?: string;
+  details?: Record<string, unknown>;
+}
+
+const RequireAuth: React.FC<RequireAuthProps> = ({
+  children,
+  allowedRoles = [],
+  allowedTiers = [],
 }) => {
-  const [user, setUser] = useState<AquorixUser | null>(null);
+  const navigate = useNavigate();
+
+  const [ctx, setCtx] = useState<AquorixAuthContext | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [supabaseSession, setSupabaseSession] = useState<any>(null);
+  const [authError, setAuthError] = useState<AuthErrorState>({ type: null });
+
+  // For stable comparisons only (do NOT trigger /me refetch)
+  const allowedRolesKey = useMemo(() => allowedRoles.join('|'), [allowedRoles]);
+  const allowedTiersKey = useMemo(() => allowedTiers.join('|'), [allowedTiers]);
 
   useEffect(() => {
-    const checkAuth = async () => {
+    let isMounted = true;
+
+    const checkAuthOnce = async () => {
       try {
-        // 1. Check Supabase session (for authentication)
+        setLoading(true);
+        setAuthError({ type: null });
+
+        // 1) Check Supabase session (auth only)
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError) {
-          console.error('[RequireAuth] Session error:', sessionError);
-          setAuthChecked(true);
-          setLoading(false);
+          console.error('[RequireAuth] Supabase session error:', sessionError);
+          if (!isMounted) return;
+          setCtx(null);
+          setAuthError({ type: 'NO_SESSION' });
           return;
         }
 
-        if (!session?.user?.id) {
-          console.log('[RequireAuth] No authenticated session');
-          setAuthChecked(true);
-          setLoading(false);
+        if (!session?.access_token || !session?.user?.id) {
+          console.log('[RequireAuth] No authenticated Supabase session');
+          if (!isMounted) return;
+          setCtx(null);
+          setAuthError({ type: 'NO_SESSION' });
           return;
         }
 
-        setSupabaseSession(session);
-
-        // 2. Get user role/tier from AQUORIX backend
-        const response = await fetch(`http://localhost:3001/api/users/me?user_id=${session.user.id}`);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            console.log('[RequireAuth] User not found in AQUORIX database');
-          } else {
-            console.error('[RequireAuth] API error:', response.status);
-          }
-          setAuthChecked(true);
-          setLoading(false);
+        // 2) Call /api/v1/me for authoritative context
+        let res: Response;
+        try {
+          res = await fetch(ME_URL, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            cache: 'no-store',
+            credentials: 'omit',
+          });
+        } catch (netErr) {
+          console.error('[RequireAuth] /me network failure:', netErr);
+          if (!isMounted) return;
+          setCtx(null);
+          setAuthError({
+            type: 'ME_BACKEND_DOWN',
+            message: 'Backend unreachable. Please try again.',
+          });
           return;
         }
 
-        const userData: AquorixUser = await response.json();
-        console.log('[RequireAuth] User data loaded:', userData);
-        
-        setUser(userData);
-        setAuthChecked(true);
+        const status = res.status;
+        let meData: MeResponse | null = null;
 
-      } catch (error) {
-        console.error('[RequireAuth] Auth check failed:', error);
-        setAuthChecked(true);
+        try {
+          meData = (await res.json()) as MeResponse;
+        } catch {
+          meData = null;
+        }
+
+        console.log('[RequireAuth] /me response summary:', {
+          http_status: status,
+          ok: (meData as any)?.ok,
+          routing_hint: (meData as any)?.routing_hint,
+        });
+
+        // 401 => treat as logged out (token invalid/expired)
+        if (status === 401) {
+          if (!isMounted) return;
+          setCtx(null);
+          setAuthError({
+            type: 'ME_UNAUTHORIZED',
+            message: 'Session expired. Please sign in again.',
+          });
+          return;
+        }
+
+        // Any non-OK /me besides 401 => show backend-down (do NOT mask as onboarding)
+        if (!res.ok || !meData) {
+          console.error('[RequireAuth] /me request failed:', {
+            http_status: status,
+            payload: meData,
+          });
+
+          if (!isMounted) return;
+          setCtx(null);
+          setAuthError({
+            type: 'ME_BACKEND_DOWN',
+            message: 'Unable to load user context from backend.',
+            details: { http_status: status },
+          });
+          return;
+        }
+
+        // 3) Normalize /me payload into stable ctx
+        const supabase_user_id =
+          (meData as any)?.identity?.supabase_user_id ?? session.user.id ?? null;
+
+        const email =
+          (meData as any)?.identity?.email ?? session.user.email ?? null;
+
+        const user_id =
+          (meData as any)?.aquorix_user?.user_id ?? null;
+
+        const tier =
+          (meData as any)?.aquorix_user?.tier ?? null;
+
+        // MVP semantic: role := operator affiliation
+        const affiliation =
+          (meData as any)?.operator?.affiliation ?? null;
+
+        const role = affiliation ? String(affiliation) : null;
+
+        const routing_hint_raw = (meData as any)?.routing_hint ?? null;
+        const routing_hint =
+          routing_hint_raw === 'dashboard' || routing_hint_raw === 'onboarding' || routing_hint_raw === 'login'
+            ? routing_hint_raw
+            : null;
+
+        const normalized: AquorixAuthContext = {
+          supabase_user_id,
+          email,
+          user_id,
+          tier,
+          role,
+          is_active: true,
+          routing_hint,
+        };
+
+        if (!isMounted) return;
+        setCtx(normalized);
+
+        // If backend says onboarding, that is authoritative.
+        // (We do not set an error here; render will redirect.)
+        if (routing_hint === 'onboarding') {
+          return;
+        }
+
+        // If AQUORIX user is missing, treat as onboarding-required
+        if (!user_id) {
+          setAuthError({
+            type: 'AQUORIX_USER_MISSING',
+            message: 'Account setup required.',
+          });
+          return;
+        }
+
+        // Inactive (future-proof; currently always true)
+        if (normalized.is_active === false) {
+          setAuthError({ type: 'INACTIVE' });
+          return;
+        }
+
+        // Role gating
+        if (allowedRoles.length > 0 && !allowedRoles.includes(role ?? '')) {
+          setAuthError({
+            type: 'ROLE_DENIED',
+            details: { required: allowedRoles, actual: role ?? null },
+          });
+          return;
+        }
+
+        // Tier gating
+        if (allowedTiers.length > 0 && !allowedTiers.includes(tier ?? '')) {
+          setAuthError({
+            type: 'TIER_DENIED',
+            details: { required: allowedTiers, actual: tier ?? null },
+          });
+          return;
+        }
+
+        // Authorized
+        setAuthError({ type: null });
+      } catch (err) {
+        console.error('[RequireAuth] Auth check failed:', err);
+        if (!isMounted) return;
+        setCtx(null);
+        setAuthError({
+          type: 'ME_BACKEND_DOWN',
+          message: 'Unexpected error while checking authorization.',
+        });
       } finally {
+        if (!isMounted) return;
         setLoading(false);
       }
     };
 
-    checkAuth();
+    checkAuthOnce();
+
+    return () => {
+      isMounted = false;
+    };
+    // IMPORTANT: fetch /me once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Show loading while checking auth
-  if (loading || !authChecked) {
+  // -----------------------------
+  // Render Gate
+  // -----------------------------
+
+  if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '50vh' 
-      }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
         <div>Authenticating...</div>
       </div>
     );
   }
 
-  // Redirect to login if no Supabase session
-  if (!supabaseSession) {
+  // No session OR token invalid => login
+  if (!ctx || authError.type === 'NO_SESSION' || authError.type === 'ME_UNAUTHORIZED') {
     return <Navigate to="/login" replace />;
   }
 
-  // Show error if user not found in AQUORIX database
-  if (!user) {
+  // Backend routing authority: onboarding
+  if (ctx.routing_hint === 'onboarding') {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  // Backend unavailable => explicit error screen (no loops)
+  if (authError.type === 'ME_BACKEND_DOWN') {
     return (
-      <div style={{ 
-        padding: '2rem', 
-        textAlign: 'center',
-        color: '#dc2626' 
-      }}>
-        <h2>Account Setup Required</h2>
-        <p>Your account needs to be set up in our system.</p>
-        <p>Please contact support or complete the onboarding process.</p>
-        <button 
-          onClick={() => window.location.href = '/onboarding'}
-          style={{ 
-            padding: '0.5rem 1rem', 
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
+        <h2>Service Unavailable</h2>
+        <p>{authError.message || 'Unable to load user context.'}</p>
+        <p style={{ color: '#111', marginTop: 12, fontSize: 14 }}>
+          If this persists, check that the API is running on port 3001 and that /api/v1/me is reachable.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            padding: '0.5rem 1rem',
             marginTop: '1rem',
             backgroundColor: '#2574d9',
             color: 'white',
             border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
+            borderRadius: 4,
+            cursor: 'pointer',
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // Missing AQUORIX user => show setup UI (no embedded Navigate)
+  if (authError.type === 'AQUORIX_USER_MISSING') {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
+        <h2>Account Setup Required</h2>
+        <p>Your account needs to be set up in our system.</p>
+        <p>Please complete onboarding.</p>
+        <button
+          onClick={() => navigate('/onboarding')}
+          style={{
+            padding: '0.5rem 1rem',
+            marginTop: '1rem',
+            backgroundColor: '#2574d9',
+            color: 'white',
+            border: 'none',
+            borderRadius: 4,
+            cursor: 'pointer',
           }}
         >
           Complete Onboarding
@@ -136,43 +392,34 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
     );
   }
 
-  // ✅ Only treat explicitly false as inactive
-  if (user.is_active === false) {
+  // Inactive
+  if (authError.type === 'INACTIVE' || ctx.is_active === false) {
     return (
-      <div style={{ 
-        padding: '2rem', 
-        textAlign: 'center',
-        color: '#dc2626' 
-      }}>
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
         <h2>Account Inactive</h2>
         <p>Your account has been deactivated. Please contact support.</p>
       </div>
     );
   }
 
-  // Check role authorization
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    console.warn('[RequireAuth] Role not authorized:', user.role, 'Allowed:', allowedRoles);
+  // Role denied
+  if (authError.type === 'ROLE_DENIED') {
     return (
-      <div style={{ 
-        padding: '2rem', 
-        textAlign: 'center',
-        color: '#dc2626' 
-      }}>
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
         <h2>Not Authorized</h2>
         <p>You are not authorized to access this page.</p>
         <p>Required role: {allowedRoles.join(', ')}</p>
-        <p>Your role: {user.role}</p>
-        <button 
-          onClick={() => window.location.href = '/dashboard'}
-          style={{ 
-            padding: '0.5rem 1rem', 
+        <p>Your role: {ctx.role || '(none)'}</p>
+        <button
+          onClick={() => navigate('/dashboard')}
+          style={{
+            padding: '0.5rem 1rem',
             marginTop: '1rem',
             backgroundColor: '#2574d9',
             color: 'white',
             border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
+            borderRadius: 4,
+            cursor: 'pointer',
           }}
         >
           Return to Dashboard
@@ -181,29 +428,24 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
     );
   }
 
-  // Check tier authorization
-  if (allowedTiers.length > 0 && !allowedTiers.includes(user.tier)) {
-    console.warn('[RequireAuth] Tier not authorized:', user.tier, 'Allowed:', allowedTiers);
+  // Tier denied
+  if (authError.type === 'TIER_DENIED') {
     return (
-      <div style={{ 
-        padding: '2rem', 
-        textAlign: 'center',
-        color: '#dc2626' 
-      }}>
+      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
         <h2>Not Authorized</h2>
         <p>You are not authorized to access this page.</p>
         <p>Required tier: {allowedTiers.join(', ')}</p>
-        <p>Your tier: {user.tier}</p>
-        <button 
-          onClick={() => window.location.href = '/dashboard'}
-          style={{ 
-            padding: '0.5rem 1rem', 
+        <p>Your tier: {ctx.tier || '(none)'}</p>
+        <button
+          onClick={() => navigate('/dashboard')}
+          style={{
+            padding: '0.5rem 1rem',
             marginTop: '1rem',
             backgroundColor: '#2574d9',
             color: 'white',
             border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
+            borderRadius: 4,
+            cursor: 'pointer',
           }}
         >
           Return to Dashboard
@@ -212,8 +454,13 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
     );
   }
 
-  // User is authenticated and authorized
-  console.log('[RequireAuth] User authorized:', { role: user.role, tier: user.tier });
+  console.log('[RequireAuth] User authorized:', {
+    user_id: ctx.user_id,
+    role: ctx.role,
+    tier: ctx.tier,
+    constraints: { allowedRolesKey, allowedTiersKey },
+  });
+
   return <>{children}</>;
 };
 
