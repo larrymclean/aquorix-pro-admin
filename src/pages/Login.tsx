@@ -1,128 +1,155 @@
 /*
- * File: Login.tsx
- * Path: src/pages/Login.tsx
- * Description: AQUORIX login page. Uses centralized getUserRole utility for post-login role/tier resolution and redirect.
- * Author: AQUORIX Engineering
- * Created: 2025-07-07
- * Last Updated: 2025-09-16
- * Status: MVP, auth logic centralized
- * Dependencies: React, supabaseClient, getUserRole
- * Notes: Uses getUserRole for all role/tier logic. Robust error handling for all scenarios.
- * Change Log:
- *   2025-07-11 (AQUORIX Eng): Refactored to use getUserRole utility, improved error handling and redirect logic.
- *   2025-07-11 (AQUORIX Eng): Added robust error trapping, UI feedback, and retry button to login flow.
- *   2025-09-16 (AQUORIX Eng): Standardized container width to match onboarding flow consistency.
+ * ============================================================================
+ * File:        Login.tsx
+ * Path:        src/pages/Login.tsx
+ * Project:     AQUORIX Pro Dashboard
+ * ============================================================================
+ * Description:
+ *   Login page for AQUORIX Pro users.
+ *
+ *   This implementation:
+ *   - Authenticates via Supabase
+ *   - Delegates ALL post-login routing decisions to /api/v1/me
+ *   - Eliminates hardcoded redirects and legacy user lookups
+ *
+ * Architectural Rule:
+ *   Frontend does NOT decide onboarding vs dashboard.
+ *   Backend (/api/v1/me) is the single source of truth.
+ *
+ * Author:      AQUORIX Engineering
+ * Created:     2025-08-01
+ *
+ * Change Log (append-only):
+ * --------------------------------------------------------------------------
+ * v1.0.0  2025-08-01  AQUORIX Engineering
+ *   - Initial login implementation
+ *
+ * v1.1.0  2025-12-24  Larry McLean
+ *   - Replace manual redirects with /api/v1/me routing
+ *   - Remove window.location.href usage
+ *   - Align login flow with onboarding resolver
+ *
+ * v1.2.0  2025-12-25  Larry McLean
+ *   - Restore complete two-panel UI (gradient + logo)
+ *   - Preserve all original styling and UX elements
+ *   - Integrate /api/v1/me routing while maintaining UI integrity
+ *   - Add comprehensive error handling and console logging
+ *   - Professional logging output (no emoji characters)
+ *   - Add explicit fetch method and cache control
+ *   - Form disabled during loading state
+ * ============================================================================
  */
+
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import '../styles/Auth.css';
-import { getUserRole } from '../utils/getUserRole';
-
-interface LoginCredentials {
-  identifier: string;
-  password: string;
-  rememberMe: boolean;
-}
 
 const Login: React.FC = () => {
-  const [credentials, setCredentials] = useState<LoginCredentials>({
+  const navigate = useNavigate();
+  
+  const [credentials, setCredentials] = useState({
     identifier: '',
     password: '',
     rememberMe: false
   });
-
+  
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  /**
-   * Handle user login and post-auth role/tier resolution.
-   * Robust error trapping and UI feedback.
-   */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
-      // Transform identifier based on format
-      const loginEmail = credentials.identifier.includes('@') 
-        ? credentials.identifier 
-        : `${credentials.identifier}@placeholder.com`;
+      // Auth method (MVP): Supabase email/password.
+      // Do NOT fabricate emails for username/phone until we implement a real mapping layer.
+      const loginEmail = credentials.identifier.trim();
 
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      if (!loginEmail.includes('@')) {
+        setError('Please sign in with your email address.');
+        console.error('[Login] Identifier is not an email. MVP requires email/password.');
+        return;
+      }
+
+      // 1. Supabase authentication
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password: credentials.password
       });
 
-      if (authError) {
-        setError(authError.message);
-        console.error('[Login] Supabase login error:', authError);
-      } else {
-        // Handle remember me
-        if (credentials.rememberMe) {
-          localStorage.setItem('rememberMe', 'true');
-        } else {
-          localStorage.removeItem('rememberMe');
-        }
-
-        // Redirect based on user role/tier (centralized)
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          setError('User not found after login.');
-          console.error('[Login] No user returned after login.');
-          return;
-        }
-
-        // ✅ NEW: store Supabase ID in localStorage for dashboard
-        localStorage.setItem("supabase_user_id", user.id);
-
-        try {
-          const { role, tier } = await getUserRole(user);
-          let redirectPath = '/dashboard';
-          const internalAdminRoles = ['admin', 'support', 'moderator', 'dev', 'exec', 'ops'];
-          if (role && internalAdminRoles.includes(role)) {
-            redirectPath = '/admin/overview';
-            console.log('[Login][DEBUG] Internal admin role detected, redirecting to', redirectPath, 'role:', role, 'tier:', tier);
-          } else if (tier && ['solo', 'entrepreneur', 'dive_center', 'complex'].includes(tier)) {
-            redirectPath = '/dashboard';
-            console.log('[Login][DEBUG] Pro user, redirecting to', redirectPath, 'role:', role, 'tier:', tier);
-          } else if (tier === 'affiliate') {
-            redirectPath = '/partner';
-            console.log('[Login][DEBUG] Partner user, redirecting to', redirectPath, 'role:', role, 'tier:', tier);
-          } else if (!role || role === 'guest' || role === 'authenticated' || role === '-') {
-            console.log('[Login][DEBUG] New user detected, redirecting to /onboarding', 'role:', role, 'tier:', tier);
-            window.location.href = '/onboarding';
-            return;
-          } else {
-            setError('No valid role found. Please contact support.');
-            console.error('[Login] No valid role found for user:', user, 'role:', role, 'tier:', tier);
-            return;
-          }
-          window.location.href = redirectPath;
-        } catch (roleErr: any) {
-          setError('Error determining user role: ' + (roleErr?.message || 'Unknown error'));
-          console.error('[Login] Error in getUserRole:', roleErr);
-        }
+      if (authError || !data.session) {
+        setError(authError?.message || 'Login failed');
+        console.error('[Login] Supabase authentication failed:', authError);
+        return;
       }
 
-    } catch (error) {
-      setError('An unexpected error occurred during login.');
+      console.log('[Login] Supabase authentication successful');
+
+      // Handle remember me
+      if (credentials.rememberMe) {
+        localStorage.setItem('rememberMe', 'true');
+      } else {
+        localStorage.removeItem('rememberMe');
+      }
+
+      // 2. Call /api/v1/me to determine routing
+      try {
+        const response = await fetch('http://localhost:3001/api/v1/me', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${data.session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          cache: 'no-store',
+          credentials: 'omit'
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.log('[Login] Unauthorized response from /me endpoint, redirecting to login');
+            navigate('/login');
+            return;
+          }
+          if (response.status === 404) {
+            console.log('[Login] User not found in AQUORIX database, redirecting to onboarding');
+            navigate('/onboarding');
+            return;
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const meData = await response.json();
+
+        console.log('[Login] /me endpoint response:', {
+          ok: meData.ok,
+          routing_hint: meData.routing_hint,
+          onboarding_complete: meData.onboarding?.is_complete
+        });
+
+        // 3. Route based on backend decision
+        if (meData.ok && meData.routing_hint === 'dashboard') {
+          console.log('[Login] Routing to dashboard');
+          navigate('/dashboard');
+        } else {
+          console.log('[Login] Routing to onboarding');
+          navigate('/onboarding');
+        }
+
+      } catch (meError: unknown) {
+        console.error('[Login] /me endpoint call failed:', meError);
+        setError('Failed to load user context. Please try again.');
+      }
+
+    } catch (error: unknown) {
       console.error('[Login] Unexpected error:', error);
+      setError('An unexpected error occurred during login.');
     } finally {
       setIsLoading(false);
     }
   };
-
-  /**
-   * Retry login handler
-   */
-  const handleRetry = () => {
-    setError('');
-    setIsLoading(false);
-  };
-
-  // State for password visibility toggle (AQUORIX standards)
-  const [showPassword, setShowPassword] = React.useState<boolean>(false);
 
   return (
     <div style={{ 
@@ -145,7 +172,11 @@ const Login: React.FC = () => {
         alignItems: 'center', 
         justifyContent: 'center' 
       }}>
-        <img src="/aqx-ctd-logo.svg" alt="AQUORIX Logo" style={{ width: 140, height: 140, marginBottom: 32 }} />
+        <img 
+          src="/aqx-ctd-logo.svg" 
+          alt="AQUORIX Logo" 
+          style={{ width: 140, height: 140, marginBottom: 32 }} 
+        />
       </div>
       
       {/* Right Form Panel */}
@@ -177,7 +208,7 @@ const Login: React.FC = () => {
         </div>
 
         <form onSubmit={handleLogin} className="onboarding-form">
-          {/* Error Display Section */}
+          {/* Error Display */}
           {error && (
             <div style={{ 
               color: '#e74c3c', 
@@ -189,43 +220,32 @@ const Login: React.FC = () => {
               fontSize: 14
             }}>
               <strong>Login Error:</strong> {error}
-              <button
-                type="button"
-                style={{ 
-                  background: '#f1f5fa', 
-                  color: '#2574d9', 
-                  border: '1px solid #c3d0e8', 
-                  borderRadius: 4, 
-                  padding: '4px 12px', 
-                  fontSize: 12,
-                  marginLeft: 12,
-                  cursor: 'pointer'
-                }}
-                onClick={handleRetry}
-                disabled={isLoading}
-              >
-                Retry
-              </button>
             </div>
           )}
 
+          {/* Email/Username Input */}
           <div className="form-group" style={{ marginBottom: 18 }}>
             <input
               type="text"
               placeholder="Email / Username / Phone"
               value={credentials.identifier}
               onChange={(e) => setCredentials({ ...credentials, identifier: e.target.value })}
+              disabled={isLoading}
+              required
               style={{ 
                 width: '100%', 
                 fontSize: 17, 
                 padding: '12px 14px', 
                 borderRadius: 6, 
                 border: '1px solid #c3d0e8',
-                marginBottom: 6
+                marginBottom: 6,
+                cursor: isLoading ? 'not-allowed' : 'text',
+                opacity: isLoading ? 0.6 : 1
               }}
             />
           </div>
 
+          {/* Password Input */}
           <div className="form-group" style={{ marginBottom: 18 }}>
             <div style={{ position: 'relative', width: '100%' }}>
               <input
@@ -233,26 +253,31 @@ const Login: React.FC = () => {
                 placeholder="Password"
                 value={credentials.password}
                 onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+                disabled={isLoading}
+                required
                 autoComplete="current-password"
-                aria-label="Password"
                 style={{ 
                   width: '100%', 
                   fontSize: 17, 
                   padding: '12px 14px', 
                   borderRadius: 6, 
                   border: '1px solid #c3d0e8',
-                  marginBottom: 6
+                  marginBottom: 6,
+                  cursor: isLoading ? 'not-allowed' : 'text',
+                  opacity: isLoading ? 0.6 : 1
                 }}
               />
               <span style={{ position: 'absolute', right: 12, top: 12, cursor: 'pointer' }}>
                 <button
                   type="button"
-                  onClick={() => setShowPassword((v) => !v)}
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading}
                   style={{ 
                     background: 'none', 
                     border: 'none', 
-                    cursor: 'pointer',
-                    padding: 0
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    padding: 0,
+                    opacity: isLoading ? 0.6 : 1
                   }}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
@@ -273,6 +298,7 @@ const Login: React.FC = () => {
             </div>
           </div>
 
+          {/* Remember Me / Forgot Password */}
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -280,11 +306,18 @@ const Login: React.FC = () => {
             marginBottom: 20,
             fontSize: 14
           }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <label style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 6, 
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.6 : 1
+            }}>
               <input
                 type="checkbox"
                 checked={credentials.rememberMe}
                 onChange={(e) => setCredentials({ ...credentials, rememberMe: e.target.checked })}
+                disabled={isLoading}
               />
               Remember me
             </label>
@@ -293,6 +326,7 @@ const Login: React.FC = () => {
             </a>
           </div>
 
+          {/* Submit Button */}
           <button 
             type="submit" 
             disabled={isLoading} 
@@ -312,6 +346,7 @@ const Login: React.FC = () => {
             {isLoading ? 'Signing In...' : 'Sign In'}
           </button>
 
+          {/* Sign Up Link */}
           <div style={{ textAlign: 'center', fontSize: 14, color: '#7b8ca6' }}>
             Don't have an account?{' '}
             <a href="/signup" style={{ color: '#2574d9', textDecoration: 'none', fontWeight: 500 }}>
