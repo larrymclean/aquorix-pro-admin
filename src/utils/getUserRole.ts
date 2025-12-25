@@ -1,15 +1,20 @@
 /*
  * File: getUserRole.ts
  * Path: src/utils/getUserRole.ts
- * Description: Simplified Login/Resume Logic using pro_profiles as single checkpoint. Clean, PHP-style approach - one source of truth for user state.
+ * Description: Simplified Login/Resume Logic using /api/v1/me as single authority (Phase B locked)
  * Author: Claude & ChatGPT collaboration with Larry McLean
  * Created: 2025-09-18
+ * Version: 1.0.0
  * Last Updated: 2025-09-18
  * Status: Ready for implementation - Single Source of Truth approach
+ *
  * Dependencies: supabaseClient
- * Notes: Eliminates onboarding_users staging table dependency. Uses users + pro_profiles as single checkpoint system with onboarding_metadata for progress tracking.
+ *
+ * Notes: Eliminates onboarding_users staging table dependency. Uses /api/v1/me as the canonical checkpoint for role/tier + onboarding routing.
+ *
  * Change Log:
  * 2025-09-18 (Claude & ChatGPT): Complete refactor to eliminate dual-flow confusion. Implemented single source of truth using pro_profiles.onboarding_metadata for all resume logic and progress tracking.
+ * 2025-12-25 - v1.0.1 - Migrated getUserRole + checkOnboardingStatus to /api/v1/me (remove legacy /by-supabase-id). Preserve error semantics + return shape. Fixed duplicate vars + token header syntax.
  */
 
 import { supabase } from '../lib/supabaseClient';
@@ -26,90 +31,91 @@ interface UserRole {
   };
 }
 
-interface ProProfile {
-  onboarding_metadata: {
-    completion_percentage?: number;
-    current_step?: number;
-    started_at?: string;
-    last_activity?: string;
-    completed_steps?: number[];
-    step1_completed?: boolean;
-    step2_completed?: boolean;
-    step3_completed?: boolean;
-    step4_completed?: boolean;
-  } | null;
-  first_name: string | null;
-  last_name: string | null;
-  tier_level: number | null;
-}
-
-interface UserData {
-  role: string;
-  tier: string;
-  email: string;
-  pro_profiles: ProProfile | null;
-}
-
 /**
  * FRONTEND: getUserRole() function - Single Source of Truth
- * Replace your existing getUserRole with this simplified version
+ * Uses /api/v1/me for canonical context + onboarding routing.
+ * Preserves error semantics:
+ *  - no user => action:error redirect:/login
+ *  - any failure => action:error redirect:/login
  */
 export async function getUserRole(user: User | null): Promise<UserRole> {
   if (!user?.id) {
-    return {
-      role: null,
-      tier: null,
-      action: 'error',
-      redirect: '/login'
-    };
+    return { role: null, tier: null, action: 'error', redirect: '/login' };
   }
 
   try {
-    // 🔄 Replace Supabase query with backend API call
-    const response = await fetch(`/api/users/by-supabase-id/${user.id}`);
-    if (!response.ok) throw new Error('User not found');
-    const data = await response.json();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
 
-    // Debug logging for onboarding logic
-    const profile: ProProfile | null = data || null;
-    const metadata = profile?.onboarding_metadata;
-    console.log('getUserRole debug:', {
-      hasData: !!data,
-      profile,
-      metadata,
-      completionPercentage: metadata?.completion_percentage
+    if (!token) {
+      return { role: null, tier: null, action: 'error', redirect: '/login' };
+    }
+
+    const response = await fetch('/api/v1/me', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store'
     });
 
-    // Check onboarding completion status
-    if (!metadata) {
-      // User exists but no onboarding metadata - start fresh
-      return {
-        role: data.role,
-        tier: data.tier,
-        action: 'start_onboarding',
-        redirect: '/onboarding/step1'
-      };
+    if (!response.ok) {
+      return { role: null, tier: null, action: 'error', redirect: '/login' };
     }
 
-    const completionPercentage = metadata.completion_percentage || 0;
-    const currentStep = metadata.current_step || 1;
+    const me = await response.json();
 
-    if (completionPercentage === 100) {
-      return { role: data.role, tier: data.tier, action: 'dashboard', redirect: '/dashboard' };
+    const role: string | null = me?.operator?.affiliation ?? null;
+    const tier: string | null = me?.aquorix_user?.tier ?? null;
+
+    // Resilient onboarding resolution (no shape guessing required)
+    const onboarding =
+      me?.onboarding ??
+      me?.aquorix_user?.profile?.onboarding_metadata ??
+      me?.operator?.pro_profile?.onboarding_metadata ??
+      null;
+
+    const completionPercentage =
+      typeof onboarding?.completion_percentage === 'number'
+        ? onboarding.completion_percentage
+        : (onboarding?.is_complete === true ? 100 : 0);
+
+    const currentStep =
+      typeof onboarding?.current_step === 'number'
+        ? onboarding.current_step
+        : 1;
+
+    console.log('getUserRole debug:', {
+      ok: me?.ok,
+      routing_hint: me?.routing_hint,
+      role,
+      tier,
+      onboarding_present: !!onboarding,
+      completionPercentage,
+      currentStep
+    });
+
+    // No onboarding => start fresh
+    if (!onboarding) {
+      return { role, tier, action: 'start_onboarding', redirect: '/onboarding/step1' };
     }
 
+    // Complete => dashboard
+    if (completionPercentage === 100 || me?.routing_hint === 'dashboard' || onboarding?.is_complete === true) {
+      return { role, tier, action: 'dashboard', redirect: '/dashboard' };
+    }
+
+    // Incomplete => resume onboarding
     if (completionPercentage < 100) {
       return {
-        role: data.role,
-        tier: data.tier,
+        role,
+        tier,
         action: 'resume_onboarding',
         redirect: `/onboarding/step${currentStep}`,
         progress: { step: currentStep, percentage: completionPercentage }
       };
     }
 
-    // fallback (should never hit)
-    return { role: data.role, tier: data.tier, action: 'needs_setup', redirect: '/account-setup' };
+    // fallback
+    return { role, tier, action: 'needs_setup', redirect: '/account-setup' };
 
   } catch (error) {
     console.error('Error in getUserRole:', error);
@@ -117,9 +123,9 @@ export async function getUserRole(user: User | null): Promise<UserRole> {
   }
 }
 
-
 /**
  * Helper function to check if user needs onboarding
+ * Preserves fail-closed semantics: on any error => needsOnboarding: true
  */
 export async function checkOnboardingStatus(userId: string): Promise<{
   needsOnboarding: boolean;
@@ -127,23 +133,47 @@ export async function checkOnboardingStatus(userId: string): Promise<{
   completionPercentage?: number;
 }> {
   try {
-    const response = await fetch(`/api/users/by-supabase-id/${userId}`);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
+    if (!token) {
+      return { needsOnboarding: true };
+    }
+
+    const response = await fetch('/api/v1/me', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store'
+    });
+
     if (!response.ok) {
       return { needsOnboarding: true };
     }
-    const data = await response.json();
 
-    const metadata = data?.onboarding_metadata;
+    const me = await response.json();
 
-    if (!metadata) {
+    const onboarding =
+      me?.onboarding ??
+      me?.aquorix_user?.profile?.onboarding_metadata ??
+      me?.operator?.pro_profile?.onboarding_metadata ??
+      null;
+
+    if (!onboarding) {
       return { needsOnboarding: true };
     }
 
-    const completionPercentage = metadata.completion_percentage || 0;
-    const currentStep = metadata.current_step || 1;
+    const completionPercentage =
+      typeof onboarding?.completion_percentage === 'number'
+        ? onboarding.completion_percentage
+        : (onboarding?.is_complete === true ? 100 : 0);
+
+    const currentStep =
+      typeof onboarding?.current_step === 'number'
+        ? onboarding.current_step
+        : 1;
 
     return {
-      needsOnboarding: completionPercentage < 100,
+      needsOnboarding: completionPercentage < 100 && me?.routing_hint !== 'dashboard',
       currentStep,
       completionPercentage
     };
@@ -153,24 +183,3 @@ export async function checkOnboardingStatus(userId: string): Promise<{
     return { needsOnboarding: true };
   }
 }
-
-/**
- * USAGE EXAMPLES:
- * 
- * 1. In your login component:
- *    const userState = await getUserRole(user);
- *    if (userState.action === 'resume_onboarding') {
- *      router.push(userState.redirect);
- *    }
- * 
- * 2. Quick status check:
- *    const status = await checkOnboardingStatus(user.id);
- *    if (status.needsOnboarding) {
- *      // Redirect to onboarding
- *    }
- * 
- * 3. Resume logic:
- *    - User logs in → check pro_profiles.onboarding_metadata
- *    - If < 100% → redirect to /onboarding/step{current_step}
- *    - If 100% → redirect to appropriate dashboard
- */
