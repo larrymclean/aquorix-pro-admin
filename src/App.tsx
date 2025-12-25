@@ -33,7 +33,6 @@ import RequireAuth from './components/RequireAuth';
 import SystemHealth from './pages/admin/SystemHealth';
 import { SystemHealthLogProvider } from './context/SystemHealthLogContext';
 import './styles/AQXAdmin.css';
-import DashboardPlaceholder from './pages/DashboardPlaceholder';
 import ProDashboardShell from './features/dashboard/ProDashboardShell';
 import ProDashboardMock from './features/dashboard/ProDashboardMock';
 import SchedulePage from './features/dashboard/pages/SchedulePage';

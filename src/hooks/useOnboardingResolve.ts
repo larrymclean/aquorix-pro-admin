@@ -36,7 +36,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchMe } from "../utils/fetchMe";
+import { supabase } from "../lib/supabaseClient";
 
 interface SupabaseUser {
   id: string;
@@ -79,16 +79,29 @@ export function useOnboardingResolve(supabaseUser: SupabaseUser | null): UseOnbo
       try {
         console.log("[useOnboardingResolve] Resolving route for:", supabaseUser.email);
 
-        const { status, data, error: fetchError } = await fetchMe();
+        // Get token from Supabase session (no decoding here)
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+
+        if (!token) {
+          console.warn("[useOnboardingResolve] NO_SESSION (no access token)");
+          setIsResolved(true);
+          navigate("/login");
+          return;
+        }
+
+        const resp = await fetch("/api/v1/me", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+
+        const status = resp.status;
+        const data = await resp.json().catch(() => null);
 
         // Debug-friendly logs (safe; does not print full tokens)
         console.log("[useOnboardingResolve] /me HTTP status:", status);
         console.log("[useOnboardingResolve] /me payload:", data);
-
-        if (fetchError) {
-          // This is typically NO_SESSION or a session retrieval problem.
-          console.warn("[useOnboardingResolve] fetchMe error:", fetchError);
-        }
 
         // 401 (or status=0 from fetchMe error) => treat as not logged in
         if (status === 401 || status === 0) {

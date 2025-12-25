@@ -3,20 +3,21 @@
   Path: src/pages/admin/SystemHealth.tsx
   Description: System Health & Debug Log page for AQUORIX Admin Dashboard. Renders live system health log entries from SystemHealthLogContext for QA/testing.
   Author: AQUORIX Engineering
+  Version: 1.0.0
   Created: 2025-07-08
   Last Updated: 2025-07-12
   Status: MVP, live debug log integration
   Dependencies: React, SystemHealthLogContext
   Notes: Use logSystemHealth from context to write log entries from anywhere in the app. QA/dev only.
   Change Log:
-    - 2025-07-12, AQUORIX Eng: Integrate SystemHealthLogContext, render live logs for QA/debugging.
-    - 2025-07-08, AQUORIX Eng: Initial placeholder page.
+    - 2025-07-12 - v1.0.1 - AQUORIX Eng: Integrate SystemHealthLogContext, render live logs for QA/debugging.
+    - 2025-07-08 - v1.0.2 - AQUORIX Eng: Initial placeholder page.
+    - 2025-12-25 - v1.0.3 - Removed import for getUserRole
 */
 
 import React, { useEffect, useState } from 'react';
 import { useSystemHealthLog } from '../../context/SystemHealthLogContext';
 import { supabase } from '../../lib/supabaseClient';
-import { getUserRole } from '../../utils/getUserRole';
 import { useLocation } from 'react-router-dom';
 
 interface UserSessionInfo {
@@ -56,7 +57,10 @@ const SystemHealth: React.FC = () => {
         let jwtRole = (user as any)?.app_metadata?.role || (user as any)?.user_metadata?.role;
         if (typeof jwtRole === 'string') {
           role = jwtRole.trim().toLowerCase();
+          
+          // Note 12-25-25 - v1.0.3 - import for getUserRole has been deleted
           tier = 1; // fallback, will be set by getUserRole
+          
           role_source = 'jwt/app_metadata';
         }
         // 2. Try user_profile table (fetch onboarding flags if present)
