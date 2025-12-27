@@ -1,36 +1,36 @@
 /*
   File: OnboardingWizard.tsx
   Path: src/pages/OnboardingWizard.tsx
-  Description: AQUORIX Pro Admin onboarding wizard container. Multi-step onboarding flow with tier-to-role mapping, QA, and RBAC. Uses getTierRole utility for role mapping and upserts only allowed columns to user_profile.
-  Author: Cascade AI
+  Description: AQUORIX Pro Admin onboarding wizard container (Steps 1–4)
+
+  Author: AQUORIX Engineering (Larry McLean + AI Team)
   Created: 2025-07-12
-  Last Updated: 2025-09-14
-  Status: Production-ready, QA passed, checkpointed
-  Dependencies: React, Step1Identity, Step2SelectTier, Step3ProfileSetup, Step4Confirm, getTierRole, supabaseClient
-  Notes: Tier-to-role mapping for RBAC. Only allowed columns upserted. QA and user feedback integrated. 
-  Change Log:
-    - 2025-07-12 (AQUORIX Eng): Initial scaffold and placeholder render.
-    - 2025-07-13 (Cascade): Integrated Step1Identity as Step 1; modular structure.
-    - 2025-07-18 (Cascade): Integrated Step2SelectTier as Step 2; OSC/session data continuity, submit logic, and cards.
-    - 2025-07-19 (Cascade): Bugfix: session data, OSC/Session cards, and user email flow for Step 2.
-    - 2025-09-03 (Cascade): Removed hardcoded email, now fetches authenticated user's email from Supabase session. Updated logic and comments for clarity.
-    - 2025-09-05 (Cascade): Integrated Step3ProfileSetup for tier-specific profile setup as Step 3 in onboarding wizard.
-    - 2025-09-07 (Cascade): Tier-to-role mapping (getTierRole), upsert allowed columns only, onboarding QA, RBAC/RequireAuth alignment.
-    - 2025-09-14 (AQUORIX Eng): Fixed session handling to ensure data saves to database on each step.
+  Last Updated: 2025-12-27
+  Status: Phase B+ — Deterministic public signup onboarding flow
+
+  CRITICAL FIXES (2025-12-27):
+  - Switched legacy /api/users/* calls → /api/onboarding/*
+  - Removed /api/users/promote dependency (legacy)
+  - Updated payload keys to backend contract:
+      supabase_user_id, current_step, completed_steps, completion_percentage, tier_level (optional)
+  - Added Authorization: Bearer <access_token> consistently
+  - Removed hardcoded localhost (uses relative /api/*; CRA proxy handles local routing)
+  - Removed useOnboardingResolve() from inside wizard to prevent navigation churn (DIR)
+  - Tier mapping supports current UI emitted values (e.g., "entrepreneur") while persisting canonical tier_level
 */
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
 import { supabase } from '../lib/supabaseClient';
 import { Step1Identity } from '../components/onboarding/Step1Identity';
 import Step2SelectTier from '../components/onboarding/Step2SelectTier';
 import Step3ProfileSetup from '../components/onboarding/Step3ProfileSetup';
 import Step4Confirm from '../components/onboarding/Step4Confirm';
-import { getTierRole } from '../utils/getTierRole';
+
 import TestProtoSessionTile from '../components/onboarding/TestProtoSessionTile';
 import OnboardingStatusCard from '../components/onboarding/OnboardingStatusCard';
-import { useOnboardingResolve } from '../hooks/useOnboardingResolve';
 
-// Placeholder for onboarding state (could be lifted to context in future)
 interface IdentityData {
   firstName: string;
   lastName: string;
@@ -47,171 +47,253 @@ interface OSCData {
   supabaseConfirmed: boolean;
 }
 
+function buildAuthHeaders(accessToken?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+  return headers;
+}
+
+async function postStep1(params: {
+  accessToken?: string;
+  supabase_user_id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+}) {
+  const res = await fetch('/api/onboarding/step1', {
+    method: 'POST',
+    headers: buildAuthHeaders(params.accessToken),
+    body: JSON.stringify({
+      supabase_user_id: params.supabase_user_id,
+      email: params.email,
+      first_name: params.first_name,
+      last_name: params.last_name,
+      phone: params.phone,
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`step1 failed (${res.status}) ${txt}`);
+  }
+
+  return res.json();
+}
+
+async function postUpdateStep(params: {
+  accessToken?: string;
+  supabase_user_id: string;
+  current_step: number;
+  completed_steps: number[];
+  completion_percentage: number;
+  tier_level?: number;
+  selected_tier?: string;
+}) {
+  const res = await fetch('/api/onboarding/update-step', {
+    method: 'POST',
+    headers: buildAuthHeaders(params.accessToken),
+    body: JSON.stringify({
+      supabase_user_id: params.supabase_user_id,
+      current_step: params.current_step,
+      completed_steps: params.completed_steps,
+      completion_percentage: params.completion_percentage,
+      ...(typeof params.tier_level === 'number' ? { tier_level: params.tier_level } : {}),
+      ...(params.selected_tier ? { selected_tier: params.selected_tier } : {}),
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`update-step failed (${res.status}) ${txt}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Tier string (UI) → tier_level (DB canonical)
+ * Step2SelectTier currently emits: solo | entrepreneur | dive_center | affiliate
+ */
+function mapTierToLevel(tierString: string): { tier_level: number; canonical: string } {
+  const t = (tierString || '').trim();
+
+  if (t === 'solo') return { tier_level: 1, canonical: 'solo' };
+
+  // Legacy alias emitted by current UI
+  if (t === 'entrepreneur') return { tier_level: 2, canonical: 'solo_pro_entrepreneur' };
+
+  // Future-proof canonical value (if UI updated later)
+  if (t === 'solo_pro_entrepreneur') return { tier_level: 2, canonical: 'solo_pro_entrepreneur' };
+
+  if (t === 'dive_center') return { tier_level: 3, canonical: 'dive_center' };
+  if (t === 'integrated_operator') return { tier_level: 4, canonical: 'integrated_operator' };
+  if (t === 'affiliate') return { tier_level: 5, canonical: 'affiliate' };
+
+  return { tier_level: 1, canonical: 'solo' };
+}
+
 const OnboardingWizard: React.FC = () => {
+  const navigate = useNavigate();
+
   const [step, setStep] = useState(1);
   const [identity, setIdentity] = useState<IdentityData | null>(null);
   const [selectedTier, setSelectedTier] = useState<string>('solo');
   const [profileData, setProfileData] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
-  const navigate = (window as any).navigate || ((url: string) => { window.location.href = url; });
 
-  // Session state
   const [session, setSession] = useState<any>(null);
-  const [userEmail, setUserEmail] = useState<string>('');
   const [sessionLoaded, setSessionLoaded] = useState(false);
 
-  // Load session on component mount
-  React.useEffect(() => {
+  const userEmail = session?.user?.email || '';
+  const supabaseUserId = session?.user?.id || '';
+  const accessToken = session?.access_token || '';
+
+  useEffect(() => {
     const fetchSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUserEmail(session?.user?.email || '');
+      const { data } = await supabase.auth.getSession();
+      setSession(data?.session || null);
       setSessionLoaded(true);
     };
     fetchSession();
   }, []);
 
-  // Hook for backend resolution
-  useOnboardingResolve(session?.user ? { id: session.user.id, email: session.user.email } : null);
-
-  // Password set flag from localStorage
   const [passwordSet, setPasswordSet] = useState<boolean>(false);
-  React.useEffect(() => {
+  useEffect(() => {
     const stored = localStorage.getItem('aqx_password_set');
     setPasswordSet(stored === 'true');
   }, []);
 
-  // Handler for Step 1 completion - FIXED VERSION
+  const oscData: OSCData = useMemo(() => {
+    return {
+      firstName: identity?.firstName || '',
+      lastName: identity?.lastName || '',
+      email: userEmail,
+      phone: identity?.phone || '',
+      passwordSet,
+      supabaseConfirmed: true,
+    };
+  }, [identity, userEmail, passwordSet]);
+
   const handleIdentityNext = async (data: IdentityData) => {
     setIdentity(data);
-    
-    // Wait for session if not loaded
-    if (!sessionLoaded || !session?.user?.id) {
-      console.error('Session not loaded, cannot save Step 1 data');
-      setStep(2);
+
+    if (!sessionLoaded || !supabaseUserId) {
+      alert('Session not loaded. Please sign in again.');
+      navigate('/login');
       return;
     }
-    
-    // Save Step 1 data to database immediately
+
     try {
-      console.log('Saving Step 1 data for user:', session.user.id);
-      const response = await fetch('http://localhost:3001/api/users/update-step', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supabase_user_id: session.user.id,
-          onboarding_step: 2,
-          first_name: data.firstName,
-          last_name: data.lastName,
-          phone: data.phone
-        })
+      await postStep1({
+        accessToken,
+        supabase_user_id: supabaseUserId,
+        email: userEmail,
+        first_name: data.firstName,
+        last_name: data.lastName,
+        phone: data.phone,
       });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error ${response.status}: ${errorText}`);
-      }
-      
-      console.log('Step 1 data saved successfully');
-    } catch (error) {
-      console.error('Failed to save Step 1 data:', error);
+
+      await postUpdateStep({
+        accessToken,
+        supabase_user_id: supabaseUserId,
+        current_step: 2,
+        completed_steps: [1],
+        completion_percentage: 25,
+      });
+    } catch (err: any) {
+      console.error('Step 1 save failed:', err);
+      alert(`Step 1 save failed: ${err?.message || err}`);
     }
-    
+
     setStep(2);
   };
 
-  // Handler for Step 2 completion - FIXED VERSION
   const handleTierSelected = async (tier: string) => {
     setSelectedTier(tier);
-    
-    if (!session?.user?.id) {
-      console.error('No session for Step 2 save');
-      setStep(3);
+
+    if (!sessionLoaded || !supabaseUserId) {
+      alert('Session not loaded. Please sign in again.');
+      navigate('/login');
       return;
     }
-    
+
+    const mapped = mapTierToLevel(tier);
+
     try {
-      console.log('Saving Step 2 data (tier):', tier);
-      const response = await fetch('http://localhost:3001/api/users/update-step', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supabase_user_id: session.user.id,
-          onboarding_step: 3,
-          selected_tier: tier
-        })
+      await postUpdateStep({
+        accessToken,
+        supabase_user_id: supabaseUserId,
+        current_step: 3,
+        completed_steps: [1, 2],
+        completion_percentage: 50,
+        tier_level: mapped.tier_level,
+        selected_tier: mapped.canonical,
       });
-      
-      if (!response.ok) {
-        throw new Error(`API error ${response.status}`);
-      }
-      
-      console.log('Step 2 data saved successfully');
-    } catch (error) {
-      console.error('Failed to save Step 2 data:', error);
+    } catch (err: any) {
+      console.error('Step 2 save failed:', err);
+      alert(`Step 2 save failed: ${err?.message || err}`);
     }
-    
+
     setStep(3);
   };
 
-  // Handler for Step 3 completion
   const handleProfileSetupNext = async (data: any) => {
     setProfileData(data);
-    
-    if (!session?.user?.id) {
-      console.error('No session for Step 3 save');
-      setStep(4);
+
+    if (!sessionLoaded || !supabaseUserId) {
+      alert('Session not loaded. Please sign in again.');
+      navigate('/login');
       return;
     }
-    
+
     try {
-      await fetch('http://localhost:3001/api/users/update-step', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supabase_user_id: session.user.id,
-          onboarding_step: 4,
-        }),
+      await postUpdateStep({
+        accessToken,
+        supabase_user_id: supabaseUserId,
+        current_step: 4,
+        completed_steps: [1, 2, 3],
+        completion_percentage: 75,
       });
-      console.log('Step 3 data saved successfully');
-    } catch (error) {
-      console.error('Failed to save Step 3 data:', error);
+    } catch (err: any) {
+      console.error('Step 3 update-step failed:', err);
+      alert(`Step 3 save failed: ${err?.message || err}`);
     }
-    
+
     setStep(4);
   };
 
-  // Final submit handler for Step 4
   const handleFinalSubmit = async () => {
     setSubmitting(true);
+
     try {
-      const response = await fetch('http://localhost:3001/api/users/promote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          supabase_user_id: session?.user?.id
-        })
-      });
-      if (!response.ok) {
-        throw new Error('Failed to complete onboarding');
-      }
-      alert('Onboarding complete! Welcome to your dashboard.');
-      // Session check before navigating
-      const { data: { session: refreshedSession } } = await supabase.auth.getSession();
-      if (!refreshedSession?.user) {
-        alert('Session expired. Please sign in again.');
+      const { data } = await supabase.auth.getSession();
+      const refreshedSession = data?.session || null;
+
+      if (!refreshedSession?.user?.id) {
+        alert('Session missing or expired. Please sign in again.');
         navigate('/login');
         return;
       }
+
+      await postUpdateStep({
+        accessToken: refreshedSession.access_token,
+        supabase_user_id: refreshedSession.user.id,
+        current_step: 4,
+        completed_steps: [1, 2, 3, 4],
+        completion_percentage: 100,
+      });
+
+      alert('Onboarding complete! Welcome to your dashboard.');
       navigate('/dashboard');
     } catch (err: any) {
-      alert('Failed to complete onboarding: ' + (err.message || err));
+      console.error('Final seal failed:', err);
+      alert(`Failed to complete onboarding: ${err?.message || err}`);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Show loading if session not loaded
   if (!sessionLoaded) {
     return (
       <div style={{ textAlign: 'center', padding: '2rem' }}>
@@ -220,15 +302,15 @@ const OnboardingWizard: React.FC = () => {
     );
   }
 
-  // Compose OSC data for cards
-  const oscData: OSCData = {
-    firstName: identity?.firstName || '',
-    lastName: identity?.lastName || '',
-    email: userEmail,
-    phone: identity?.phone || '',
-    passwordSet,
-    supabaseConfirmed: true,
-  };
+  if (!session?.user) {
+    return (
+      <div style={{ textAlign: 'center', padding: '2rem' }}>
+        <h2>Session Required</h2>
+        <p>Please sign in to continue onboarding.</p>
+        <button onClick={() => navigate('/login')}>Go to Sign In</button>
+      </div>
+    );
+  }
 
   return (
     <div className="onboarding-vertical-stack" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -258,6 +340,7 @@ const OnboardingWizard: React.FC = () => {
           </div>
         </>
       )}
+
       {step === 2 && (
         <Step2SelectTier
           oscData={oscData}
@@ -265,6 +348,7 @@ const OnboardingWizard: React.FC = () => {
           onTierSelected={handleTierSelected}
         />
       )}
+
       {step === 3 && (
         <Step3ProfileSetup
           tier={selectedTier}
@@ -276,6 +360,7 @@ const OnboardingWizard: React.FC = () => {
           session={session}
         />
       )}
+
       {step === 4 && (
         <Step4Confirm
           identity={identity}
@@ -287,11 +372,6 @@ const OnboardingWizard: React.FC = () => {
           onSubmit={handleFinalSubmit}
           submitting={submitting}
         />
-      )}
-      {step > 4 && (
-        <div style={{ textAlign: 'center', fontSize: 20, marginTop: 60 }}>
-          Step {step} coming soon...
-        </div>
       )}
     </div>
   );
