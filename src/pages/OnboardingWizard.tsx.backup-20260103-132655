@@ -5,9 +5,7 @@
 
   Author: AQUORIX Engineering (Larry McLean + AI Team)
   Created: 2025-07-12
-  Version: 1.2.3
-
-  Last Updated: 2026-01-03
+  Last Updated: 2025-12-28
   Status: Phase B+ — Deterministic public signup onboarding flow (Wizard = single writer)
 
   CRITICAL FIXES (2025-12-27):
@@ -24,12 +22,6 @@
   - Wizard now calls backend Step 3 E2: POST /api/onboarding/step3 (backend authoritative)
   - Step components are UI-only; Wizard orchestrates all business DB writes
   - affiliation_type 'owner' NOT supported by DB enum; backend uses 'staff' (validated)
-
-  NEW (2026-01-03):
-  - Step 1 now also updates Supabase user_metadata.displayName = "First Last" for readability.
-
-  CHANGE LOG:
-  - 2026-01-03 - v1.2.3 - Added onBack step back to step === 2, Removed Alert: (alert('Onboarding complete!)
 */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -68,17 +60,6 @@ function buildAuthHeaders(accessToken?: string) {
 
 function uniqSortedSteps(steps: number[]) {
   return Array.from(new Set(steps)).sort((a, b) => a - b);
-}
-
-/**
- * Normalize + compute a human-friendly display name.
- * - trims
- * - collapses multiple spaces
- * - safe even if one side is empty
- */
-function computeDisplayName(firstName: string, lastName: string) {
-  const raw = `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim();
-  return raw.replace(/\s+/g, ' ');
 }
 
 // Added 12-29-2025 -- fetchMe() Helper
@@ -223,6 +204,8 @@ const OnboardingWizard: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
 
   // ✅ Hydration gate (Poseidon clean):
+  // Ensures we hydrate exactly once per mount/session,
+  // prevents overwriting in-progress edits, removes ESLint deps warning.
   const didHydrateRef = useRef(false);
 
   const [session, setSession] = useState<any>(null);
@@ -232,23 +215,32 @@ const OnboardingWizard: React.FC = () => {
   const supabaseUserId = session?.user?.id || '';
   const accessToken = session?.access_token || '';
 
+  // Added 12-29-2025 -- Hydration effect helper
+  // Phase B+ Hydration:
+  // - Pull authoritative onboarding + operator context once from backend (/api/v1/me)
+  // - Populate wizard local state so Back/Next never loses entries.
   useEffect(() => {
     let mounted = true;
 
     const hydrate = async () => {
       if (!sessionLoaded) return;
-      if (!accessToken) return;
+      if (!accessToken) return; // Not logged in (RequireAuth should catch this)
       if (!supabaseUserId) return;
+
+      // ✅ Gate: hydrate only once (prevents overwrite + eliminates deps warning)
       if (didHydrateRef.current) return;
 
       try {
         const me = await fetchMe(accessToken);
 
+        // 1) Step + tier
         const onboarding = me?.onboarding || {};
         const currentStep = typeof onboarding.current_step === 'number' ? onboarding.current_step : 1;
 
         const tierLevel = me?.aquorix_user?.tier_level ?? null;
 
+        // Keep your Step2 UI string values:
+        // solo | entrepreneur | dive_center | integrated_operator | affiliate
         const selectedTierFromMe =
           tierLevel === 1 ? 'solo' :
           tierLevel === 2 ? 'entrepreneur' :
@@ -257,21 +249,26 @@ const OnboardingWizard: React.FC = () => {
           tierLevel === 5 ? 'affiliate' :
           'solo';
 
+        // 2) Identity hydration (what we can safely fill)
         const prof = me?.aquorix_user?.profile || {};
         const hydratedIdentity: IdentityData | null =
           (prof.first_name || prof.last_name || prof.phone)
             ? {
                 firstName: prof.first_name || '',
                 lastName: prof.last_name || '',
+                // We don't store countryCode separately yet; keep existing UX default.
                 countryCode: '+962',
                 phone: prof.phone || '',
               }
             : null;
 
+        // 3) Profile/operator hydration (Step 3)
         const op = me?.operator || {};
         const hydratedProfileData = {
           operator_name: op.name || '',
           logo_url: op.logo_url || null,
+          // Keep any existing fields your Step3 UI expects.
+          // We'll extend this once we open Step3ProfileSetup.tsx.
         };
 
         if (!mounted) return;
@@ -279,13 +276,19 @@ const OnboardingWizard: React.FC = () => {
         if (hydratedIdentity) setIdentity(hydratedIdentity);
         if (tierLevel) setSelectedTier(selectedTierFromMe);
 
+        // Only set profileData if we actually have something (prevents wiping user inputs)
         if (hydratedProfileData.operator_name || hydratedProfileData.logo_url) {
           setProfileData(hydratedProfileData);
         }
 
+        // Step: only push forward if backend says so (never regress the UI)
         setStep((prev) => Math.max(prev, currentStep));
+
+        // ✅ mark hydrated LAST (only after state set)
         didHydrateRef.current = true;
       } catch (e) {
+        // Do not hard-fail the wizard; keep user moving.
+        // Logging only (no drift).
         console.warn('[OnboardingWizard] hydration skipped:', (e as any)?.message || e);
       }
     };
@@ -332,7 +335,6 @@ const OnboardingWizard: React.FC = () => {
     }
 
     try {
-      // 1) Write Step 1 to AQUORIX DB (backend authoritative)
       await postStep1({
         accessToken,
         supabase_user_id: supabaseUserId,
@@ -342,21 +344,6 @@ const OnboardingWizard: React.FC = () => {
         phone: `${data.countryCode} ${data.phone}`,
       });
 
-      // 2) ALSO set Supabase user_metadata.displayName for readability
-      //    (User must be signed in; this is true during onboarding) :contentReference[oaicite:2]{index=2}
-      const displayName = computeDisplayName(data.firstName, data.lastName);
-      if (displayName) {
-        const { error } = await supabase.auth.updateUser({
-          data: { displayName },
-        });
-
-        // Do not block onboarding if this fails; warn only.
-        if (error) {
-          console.warn('[OnboardingWizard] Failed to set Supabase displayName:', error.message || error);
-        }
-      }
-
-      // 3) Update onboarding progress
       await postUpdateStep({
         accessToken,
         supabase_user_id: supabaseUserId,
@@ -401,6 +388,16 @@ const OnboardingWizard: React.FC = () => {
     setStep(3);
   };
 
+  /**
+   * STEP 3 — CRITICAL:
+   * Wizard must call backend /api/onboarding/step3 (E2) to create:
+   * - diveoperators (bigint created_by_user_id)
+   * - user_operator_affiliations (enum affiliation_type = staff)
+   *
+   * Step3ProfileSetup MUST become UI-only (no Supabase DB writes).
+   * It should pass data upward like:
+   *   { operator_name, logo_url, contact_info, is_test, ...optionalFields }
+   */
   const handleProfileSetupNext = async (data: any) => {
     setProfileData(data);
 
@@ -412,6 +409,7 @@ const OnboardingWizard: React.FC = () => {
 
     const mapped = mapTierToLevel(selectedTier);
 
+    // Normalize incoming data (so we don't depend on exact prop names while refactoring Step3)
     const operator_name =
       (typeof data?.operator_name === 'string' && data.operator_name.trim()) ||
       (typeof data?.brandName === 'string' && data.brandName.trim()) ||
@@ -428,6 +426,7 @@ const OnboardingWizard: React.FC = () => {
     }
 
     try {
+      // 1) Backend-authoritative Step 3 (creates operator + affiliation)
       const step3Result = await postStep3({
         accessToken,
         supabase_user_id: supabaseUserId,
@@ -438,6 +437,7 @@ const OnboardingWizard: React.FC = () => {
         is_test,
       });
 
+      // Preserve returned IDs for Step 4 confirmation / debug
       setProfileData({
         ...data,
         operator_name,
@@ -445,6 +445,7 @@ const OnboardingWizard: React.FC = () => {
         affiliation_type: step3Result?.affiliation_type,
       });
 
+      // 2) Update onboarding progress
       await postUpdateStep({
         accessToken,
         supabase_user_id: supabaseUserId,
@@ -482,6 +483,7 @@ const OnboardingWizard: React.FC = () => {
         completion_percentage: 100,
       });
 
+      alert('Onboarding complete! Welcome to your dashboard.');
       navigate('/dashboard');
     } catch (err: any) {
       console.error('Final seal failed:', err);
@@ -547,7 +549,6 @@ const OnboardingWizard: React.FC = () => {
           sessionData={session}
           accessToken={accessToken}
           onTierSelected={handleTierSelected}
-          onBack={() => setStep(1)}   // NEW
         />
       )}
 

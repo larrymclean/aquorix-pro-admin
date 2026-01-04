@@ -173,23 +173,38 @@ Change Log:
 .selected .checkmark {
   display: inline-flex !important;
 }
+
 .authButton {
   width: 100%;
   padding: 0.75rem;
-  background-color: #2b7de1;
+  background-color: #0A6C9B; /* cobalt-blue (darker) */
   color: white;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 0.5rem;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
-.ready {
-  background-color: #00c2f3;
-  box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
-  transition: background-color 0.2s ease;
+
+/* Disabled state */
+.authButton:disabled,
+.authButton[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
+
+/* “Ready” state (if you’re using it as primary emphasis) */
+.ready {
+  background: #0A6C9B;
+  color: #ffffff;
+}
+
+/* Hover */
+.authButton:hover:not(:disabled) {
+  background: #248dc1;          /* lt-cobalt-blue */
+}
+
 .cardSection {
   margin-top: 2rem;
   background: #f5f9ff;

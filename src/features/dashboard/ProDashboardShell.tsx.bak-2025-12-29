@@ -6,11 +6,11 @@
  * Purpose:
  *   - Provides the Pro Dashboard layout chrome (TopNav + Sidebar + Main pane)
  *   - Acts as a route shell for nested dashboard pages via <Outlet />
- * Version: 1.4.1
- * Status: MVP Phase B+ (Branding wiring)
+ * Version: 1.4.0
+ * Status: MVP Phase A (Scheduler Read Integration)
  * Notes:
- *   - Backwards compatible: if children are provided, render children;
- *     otherwise render <Outlet />.
+ *   - Keeps Dive Locker theme wrapper intact
+ *   - Child routes render inside <main> via React Router <Outlet />
  * ============================================================================
  */
 
@@ -19,11 +19,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import TopNav from './components/TopNav';
 
-type ProDashboardShellProps = {
-  children?: React.ReactNode;
-};
-
-const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
+const ProDashboardShell: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
@@ -49,7 +45,7 @@ const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
         {/* MAIN COLUMN */}
         <div className="aqx-right-pane">
           <main className="aqx-main">
-            {children ? children : <Outlet />}
+            <Outlet />
           </main>
         </div>
       </div>
