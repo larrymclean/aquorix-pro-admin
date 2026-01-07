@@ -5,31 +5,18 @@
 
   Author: AQUORIX Engineering (Larry McLean + AI Team)
   Created: 2025-07-12
-  Version: 1.2.3
+  Version: 1.2.5
 
-  Last Updated: 2026-01-03
-  Status: Phase B+ — Deterministic public signup onboarding flow (Wizard = single writer)
-
-  CRITICAL FIXES (2025-12-27):
-  - Switched legacy /api/users/* calls → /api/onboarding/*
-  - Removed /api/users/promote dependency (legacy)
-  - Updated payload keys to backend contract:
-      supabase_user_id, current_step, completed_steps, completion_percentage, tier_level (optional)
-  - Added Authorization: Bearer <access_token> consistently
-  - Removed hardcoded localhost (uses relative /api/*; CRA proxy handles local routing)
-  - Removed useOnboardingResolve() from inside wizard to prevent navigation churn (DIR)
-  - Tier mapping supports current UI emitted values (e.g., "entrepreneur") while persisting canonical tier_level
-
-  PHASE B+ FINALIZATION (2025-12-28):
-  - Wizard now calls backend Step 3 E2: POST /api/onboarding/step3 (backend authoritative)
-  - Step components are UI-only; Wizard orchestrates all business DB writes
-  - affiliation_type 'owner' NOT supported by DB enum; backend uses 'staff' (validated)
-
-  NEW (2026-01-03):
-  - Step 1 now also updates Supabase user_metadata.displayName = "First Last" for readability.
+  Last Updated: 2026-01-05
+  Status: MVP LOCK — Deterministic public signup onboarding flow (Wizard = single writer)
 
   CHANGE LOG:
-  - 2026-01-03 - v1.2.3 - Added onBack step back to step === 2, Removed Alert: (alert('Onboarding complete!)
+  - 2026-01-05 - v1.2.5
+    - Step 4 now calls POST /api/onboarding/complete (backend stamps onboarding_completed_at + step4/100%).
+    - Keep /api/onboarding/update-step available for mid-flow progress updates (Steps 1–3).
+  - 2026-01-04 - v1.2.4
+    - Step 3 payload includes: country, website, description (backend accepts; Tier 5 requires country)
+    - No route/directory changes; Smart Dashboard remains single codebase
 */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -70,18 +57,11 @@ function uniqSortedSteps(steps: number[]) {
   return Array.from(new Set(steps)).sort((a, b) => a - b);
 }
 
-/**
- * Normalize + compute a human-friendly display name.
- * - trims
- * - collapses multiple spaces
- * - safe even if one side is empty
- */
 function computeDisplayName(firstName: string, lastName: string) {
   const raw = `${(firstName || '').trim()} ${(lastName || '').trim()}`.trim();
   return raw.replace(/\s+/g, ' ');
 }
 
-// Added 12-29-2025 -- fetchMe() Helper
 async function fetchMe(accessToken: string) {
   const res = await fetch('/api/v1/me', {
     method: 'GET',
@@ -136,8 +116,11 @@ async function postStep3(params: {
   supabase_user_id: string;
   tier_level: number;
   operator_name: string;
+  country: string | null;
   logo_url: string | null;
   contact_info: any;
+  website: string | null;
+  description: string | null;
   is_test: boolean;
 }) {
   const res = await fetch('/api/onboarding/step3', {
@@ -147,8 +130,11 @@ async function postStep3(params: {
       supabase_user_id: params.supabase_user_id,
       tier_level: params.tier_level,
       operator_name: params.operator_name,
+      country: params.country,
       logo_url: params.logo_url,
       contact_info: params.contact_info,
+      website: params.website,
+      description: params.description,
       is_test: params.is_test,
     }),
   });
@@ -192,6 +178,29 @@ async function postUpdateStep(params: {
 }
 
 /**
+ * POST /api/onboarding/complete
+ * Backend stamps:
+ * - pro_profiles.onboarding_completed_at
+ * - onboarding_metadata: step4, completed_steps, 100%
+ */
+async function postComplete(params: { accessToken?: string; supabase_user_id: string }) {
+  const res = await fetch('/api/onboarding/complete', {
+    method: 'POST',
+    headers: buildAuthHeaders(params.accessToken),
+    body: JSON.stringify({
+      supabase_user_id: params.supabase_user_id,
+    }),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '');
+    throw new Error(`complete failed (${res.status}) ${txt}`);
+  }
+
+  return res.json();
+}
+
+/**
  * Tier string (UI) → tier_level (DB canonical)
  * Step2SelectTier emits: solo | entrepreneur | dive_center | integrated_operator | affiliate
  */
@@ -199,13 +208,8 @@ function mapTierToLevel(tierString: string): { tier_level: number; canonical: st
   const t = (tierString || '').trim();
 
   if (t === 'solo') return { tier_level: 1, canonical: 'solo' };
-
-  // Legacy alias emitted by current UI
   if (t === 'entrepreneur') return { tier_level: 2, canonical: 'solo_pro_entrepreneur' };
-
-  // Future-proof canonical value (if UI updated later)
   if (t === 'solo_pro_entrepreneur') return { tier_level: 2, canonical: 'solo_pro_entrepreneur' };
-
   if (t === 'dive_center') return { tier_level: 3, canonical: 'dive_center' };
   if (t === 'integrated_operator') return { tier_level: 4, canonical: 'integrated_operator' };
   if (t === 'affiliate') return { tier_level: 5, canonical: 'affiliate' };
@@ -222,7 +226,6 @@ const OnboardingWizard: React.FC = () => {
   const [profileData, setProfileData] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // ✅ Hydration gate (Poseidon clean):
   const didHydrateRef = useRef(false);
 
   const [session, setSession] = useState<any>(null);
@@ -270,8 +273,8 @@ const OnboardingWizard: React.FC = () => {
 
         const op = me?.operator || {};
         const hydratedProfileData = {
-          operator_name: op.name || '',
-          logo_url: op.logo_url || null,
+          operator_name: op?.name || '',
+          logo_url: op?.logo_url || null,
         };
 
         if (!mounted) return;
@@ -331,8 +334,18 @@ const OnboardingWizard: React.FC = () => {
       return;
     }
 
+    // Best-effort Supabase displayName
+    const displayName = computeDisplayName(data.firstName, data.lastName);
+    if (displayName) {
+      const { error } = await supabase.auth.updateUser({
+        data: { displayName, full_name: displayName, name: displayName },
+      });
+      if (error) {
+        console.warn('[OnboardingWizard] Failed to set Supabase displayName:', error.message || error);
+      }
+    }
+
     try {
-      // 1) Write Step 1 to AQUORIX DB (backend authoritative)
       await postStep1({
         accessToken,
         supabase_user_id: supabaseUserId,
@@ -342,21 +355,6 @@ const OnboardingWizard: React.FC = () => {
         phone: `${data.countryCode} ${data.phone}`,
       });
 
-      // 2) ALSO set Supabase user_metadata.displayName for readability
-      //    (User must be signed in; this is true during onboarding) :contentReference[oaicite:2]{index=2}
-      const displayName = computeDisplayName(data.firstName, data.lastName);
-      if (displayName) {
-        const { error } = await supabase.auth.updateUser({
-          data: { displayName },
-        });
-
-        // Do not block onboarding if this fails; warn only.
-        if (error) {
-          console.warn('[OnboardingWizard] Failed to set Supabase displayName:', error.message || error);
-        }
-      }
-
-      // 3) Update onboarding progress
       await postUpdateStep({
         accessToken,
         supabase_user_id: supabaseUserId,
@@ -414,16 +412,24 @@ const OnboardingWizard: React.FC = () => {
 
     const operator_name =
       (typeof data?.operator_name === 'string' && data.operator_name.trim()) ||
-      (typeof data?.brandName === 'string' && data.brandName.trim()) ||
       (typeof data?.business_name === 'string' && data.business_name.trim()) ||
       '';
 
     const logo_url = (data?.logo_url ?? null) as string | null;
-    const contact_info = data?.contact_info ?? data?.contactInfo ?? null;
+
+    const country =
+      (typeof data?.country === 'string' && data.country.trim()) ||
+      (typeof data?.contact_info?.address?.country === 'string' && data.contact_info.address.country.trim()) ||
+      null;
+
+    const contact_info = data?.contact_info ?? null;
+    const website = (typeof data?.website === 'string' && data.website.trim()) ? data.website.trim() : null;
+    const description = (typeof data?.description === 'string' && data.description.trim()) ? data.description.trim() : null;
+
     const is_test = typeof data?.is_test === 'boolean' ? data.is_test : true;
 
     if (!operator_name) {
-      alert('Step 3 is missing operator name. Please enter your brand/business name.');
+      alert('Step 3 is missing business name. Please enter a business/display name.');
       return;
     }
 
@@ -433,16 +439,19 @@ const OnboardingWizard: React.FC = () => {
         supabase_user_id: supabaseUserId,
         tier_level: mapped.tier_level,
         operator_name,
+        country,
         logo_url,
         contact_info,
+        website,
+        description,
         is_test,
       });
 
       setProfileData({
         ...data,
         operator_name,
-        operator_id: step3Result?.operator_id,
-        affiliation_type: step3Result?.affiliation_type,
+        operator_id: step3Result?.operator_id ?? null,
+        affiliate: step3Result?.affiliate ?? null,
       });
 
       await postUpdateStep({
@@ -474,6 +483,13 @@ const OnboardingWizard: React.FC = () => {
         return;
       }
 
+      // ✅ MVP LOCK: backend finalizes completion + stamps onboarding_completed_at
+      await postComplete({
+        accessToken: refreshedSession.access_token,
+        supabase_user_id: refreshedSession.user.id,
+      });
+
+      // Optional belt+suspenders (safe). Keeps metadata consistent even if complete evolves later.
       await postUpdateStep({
         accessToken: refreshedSession.access_token,
         supabase_user_id: refreshedSession.user.id,
@@ -547,7 +563,7 @@ const OnboardingWizard: React.FC = () => {
           sessionData={session}
           accessToken={accessToken}
           onTierSelected={handleTierSelected}
-          onBack={() => setStep(1)}   // NEW
+          onBack={() => setStep(1)}
         />
       )}
 

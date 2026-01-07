@@ -1,25 +1,28 @@
 /*
   File: Step3ProfileSetup.tsx
   Path: src/components/onboarding/Step3ProfileSetup.tsx
-  Description: AQUORIX onboarding Step 3 – Business & Professional Details (UI-only).
-               Collects operator/business details, optionally uploads a logo to Supabase Storage (dumb file store),
-               then passes a payload to OnboardingWizard via onNext(). NO business DB writes from client.
+  Description: AQUORIX onboarding Step 3 – Business Details (UI-only).
+               Collects ONLY (required): business_name + country
+               Optional: logo upload + short description (non-blocking)
+               Then passes payload to OnboardingWizard via onNext(). NO business DB writes from client.
   Author: AQUORIX Engineering (Larry McLean + ChatGPT Lead)
   Created: 2025-09-05
-  version: 1.2.x
+  version: 1.2.4
 
-  Last Updated: 2026-01-03
+  Last Updated: 2026-01-04
   Status: Phase B+ — Backend-authoritative onboarding (Wizard = single writer)
   Dependencies: React, Supabase (Storage only)
+
   Notes:
-    - IMPORTANT: Do NOT write to diveoperators / affiliations from client.
-    - Storage upload is allowed (file hosting only). The logo_url is persisted by backend /api/onboarding/step3.
-    - Branding requirement satisfied: if no upload, logo_url remains null and dashboard shows default logo.
+    - IMPORTANT: Do NOT write to diveoperators / affiliations / affiliates from client.
+    - Storage upload is allowed (file hosting only). Backend persists logo_url where appropriate.
+    - Tier 5 requirement: Step 3 required fields are ONLY business_name + country.
+    - No localization work in MVP; no language inputs required.
+
   Change Log:
     - 2025-09-05..2025-09-16 (Cascade): Original pixel-accurate Step 3 + Supabase DB writes (legacy).
     - 2025-12-28 (Larry + ChatGPT Lead): Refactor to UI-only + optional Storage upload; pass payload to Wizard; remove all Supabase DB writes.
-    - 2026-01-03 - v1.2.x - Added jordan country code to dropdown step 3. - aria-label="Business Phone Country Code"
-    - 2026-01-03 - Enforce required business address fields + touched-only inline errors + disable submit until valid
+    - 2026-01-04 - v1.2.4 - Simplified required inputs to business_name + country only (Tier 5 MVP). Optional logo + description retained.
 */
 
 import React, { useMemo, useRef, useState } from 'react';
@@ -39,14 +42,6 @@ interface Step3ProfileSetupProps {
   session: any;
 }
 
-type BusinessAddress = {
-  street: string;
-  city: string;
-  region: string;
-  postalCode: string;
-  country: string;
-};
-
 const LOGO_BUCKET = 'logos'; // must exist in Supabase Storage
 
 const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
@@ -58,18 +53,13 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
   passwordSet,
   session,
 }) => {
+  // Required
   const [brandName, setBrandName] = useState('');
-  const [businessPhone, setBusinessPhone] = useState('');
-  const [businessCountryCode, setBusinessCountryCode] = useState('+1');
+  const [country, setCountry] = useState('');
+
+  // Optional
   const [website, setWebsite] = useState('');
   const [description, setDescription] = useState('');
-  const [businessAddress, setBusinessAddress] = useState<BusinessAddress>({
-    street: '',
-    city: '',
-    region: '',
-    postalCode: '',
-    country: '',
-  });
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -77,41 +67,21 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ✅ touched-only inline validation (no noisy UX)
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const touch = (k: string) => setTouched((p) => ({ ...p, [k]: true }));
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /**
-   * Validation helpers (deterministic)
-   */
   const isNonTrivial = (v: any, min = 2) => typeof v === 'string' && v.trim().length >= min;
 
-  const isAddressValid = useMemo(() => {
-    return (
-      isNonTrivial(businessAddress.street, 4) &&
-      isNonTrivial(businessAddress.city, 2) &&
-      isNonTrivial(businessAddress.region, 2) &&
-      isNonTrivial(businessAddress.country, 2)
-    );
-  }, [businessAddress.street, businessAddress.city, businessAddress.region, businessAddress.country]);
+  const isValid = useMemo(() => {
+    return isNonTrivial(brandName, 2) && isNonTrivial(country, 2);
+  }, [brandName, country]);
 
-  const isBusinessValid = useMemo(() => {
-    return isNonTrivial(brandName, 2) && isAddressValid;
-  }, [brandName, isAddressValid]);
-
-  const canSubmit = isBusinessValid && !isSubmitting;
+  const canSubmit = isValid && !isSubmitting;
 
   const showBrandError = touched.brandName && !isNonTrivial(brandName, 2);
-  const showStreetError = touched.street && !isNonTrivial(businessAddress.street, 4);
-  const showCityError = touched.city && !isNonTrivial(businessAddress.city, 2);
-  const showRegionError = touched.region && !isNonTrivial(businessAddress.region, 2);
-  const showCountryError = touched.country && !isNonTrivial(businessAddress.country, 2);
-
-  const handleBrandNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setBrandName(e.target.value);
-  };
+  const showCountryError = touched.country && !isNonTrivial(country, 2);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
@@ -137,81 +107,44 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  /**
-   * Upload logo to Supabase Storage (dumb file store).
-   * Returns a public URL or null.
-   *
-   * IMPORTANT:
-   * - This function does NOT write to business DB.
-   * - Backend will persist logo_url into aquorix.diveoperators.logo_url.
-   */
   const uploadLogoToStorage = async (file: File): Promise<string> => {
     const supabaseUserId: string | undefined = session?.user?.id;
-    if (!supabaseUserId) {
-      throw new Error('NO_SUPABASE_SESSION');
-    }
+    if (!supabaseUserId) throw new Error('NO_SUPABASE_SESSION');
 
     const fileExt = file.name.split('.').pop() || 'png';
-    // Use a deterministic, user-scoped path to avoid collisions
-    const safeBrand = (brandName || 'operator')
+    const safeBrand = (brandName || 'business')
       .trim()
       .toLowerCase()
       .replace(/[^a-z0-9\-_\s]/g, '')
       .replace(/\s+/g, '-')
       .slice(0, 40);
 
-    const objectPath = `operators/${supabaseUserId}/${safeBrand}.${fileExt}`;
+    // Tier-neutral storage path
+    const objectPath = `profiles/${supabaseUserId}/${safeBrand}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
       .from(LOGO_BUCKET)
       .upload(objectPath, file, { cacheControl: '3600', upsert: true });
 
-    if (uploadError) {
-      throw uploadError;
-    }
+    if (uploadError) throw uploadError;
 
     const { data } = supabase.storage.from(LOGO_BUCKET).getPublicUrl(objectPath);
     const publicUrl = data?.publicUrl;
-    if (!publicUrl) {
-      throw new Error('NO_PUBLIC_URL');
-    }
+    if (!publicUrl) throw new Error('NO_PUBLIC_URL');
 
     return publicUrl;
   };
 
-  const buildContactInfo = () => {
-    const phoneValue = businessPhone ? `${businessCountryCode} ${businessPhone}` : null;
-
-    return {
-      phone: phoneValue,
-      address: {
-        street: businessAddress.street.trim() || null,
-        city: businessAddress.city.trim() || null,
-        region: businessAddress.region.trim() || null,
-        postalCode: businessAddress.postalCode.trim() || null,
-        country: businessAddress.country || null,
-      },
-    };
-  };
-
   const markAllRequiredTouched = () => {
-    setTouched((p) => ({
-      ...p,
-      brandName: true,
-      street: true,
-      city: true,
-      region: true,
-      country: true,
-    }));
+    setTouched((p) => ({ ...p, brandName: true, country: true }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Gate: enforce required fields (and reveal inline errors)
-    if (!isBusinessValid) {
+    if (!isValid) {
       markAllRequiredTouched();
-      setError('Please complete all required fields before continuing.');
+      setError('Please complete required fields before continuing.');
       return;
     }
 
@@ -219,7 +152,6 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Optional: upload logo first so we can send logo_url to the wizard/backend.
       let logo_url: string | null = null;
 
       if (logoFile) {
@@ -227,28 +159,31 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
           logo_url = await uploadLogoToStorage(logoFile);
         } catch (logoErr) {
           console.error('[Step3] Logo upload failed:', logoErr);
-          // Non-blocking: brand requirement still met via default logo at dashboard.
-          // We proceed without a logo_url.
           logo_url = null;
-          setError('Business saved successfully, but logo upload failed. You can upload it later.');
+          setError('Saved, but logo upload failed. You can upload later.');
         }
       }
 
+      // IMPORTANT:
+      // - operator_name is used as the canonical business display name in backend step3 for all tiers.
+      // - country is sent as top-level "country" for Tier 5 simplicity.
+      // - For compatibility, we also include contact_info.address.country (backend accepts either).
       const payload = {
-        // For backend step3:
         operator_name: brandName.trim(),
-        logo_url, // may be null
-        contact_info: buildContactInfo(),
+        country: country.trim(),
+        logo_url,
         website: website.trim() || null,
         description: description.trim() || null,
-
-        // Optional: UI/debug metadata (wizard can ignore)
+        contact_info: {
+          address: {
+            country: country.trim(),
+          },
+        },
         tier,
       };
 
-      // UI-only component: hand off to wizard orchestrator.
       onNext(payload);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[Step3] submit error:', err);
       setError('Failed to continue. Please try again.');
     } finally {
@@ -261,7 +196,7 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
       <div
         style={{
           display: 'flex',
-          minHeight: 540,
+          minHeight: 520,
           borderRadius: 12,
           overflow: 'hidden',
           background: '#fff',
@@ -309,21 +244,22 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
               textAlign: 'center',
             }}
           >
-            Step 3: Business &amp; Professional Details
+            Step 3: Business Details
           </div>
+
           <div style={{ color: '#222', fontSize: 16, marginBottom: 24, textAlign: 'center' }}>
-            Tell us about your dive operation. We'll customize your tools and dashboard accordingly.
+            Required: Business Name and Country. Optional: Logo and Description.
           </div>
 
           <form className="onboarding-form" onSubmit={handleSubmit}>
-            {/* Brand Name (REQUIRED) */}
+            {/* Business Name (REQUIRED) */}
             <div className="form-group" style={{ marginBottom: 18 }}>
               <input
                 type="text"
                 value={brandName}
-                onChange={handleBrandNameChange}
+                onChange={(e) => setBrandName(e.target.value)}
                 onBlur={() => touch('brandName')}
-                placeholder="Enter your brand name here"
+                placeholder="Business / Display Name"
                 style={{
                   width: '100%',
                   fontSize: 18,
@@ -335,179 +271,17 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
                 required
                 aria-required="true"
               />
-              {showBrandError && <div className="fieldError">Brand name is required.</div>}
+              {showBrandError && <div className="fieldError">Business name is required.</div>}
               <div style={{ color: '#7b8ca6', fontSize: 13, marginTop: 2 }}>
-                Enter your brand name. This can be your business DBA name or your name. As an independent Dive
-                Leader, we help promote your name as your brand.
+                This is your public display name. For affiliates, this is the business name.
               </div>
             </div>
 
-            {/* Business Phone (optional) */}
+            {/* Country (REQUIRED) */}
             <div className="form-group" style={{ marginBottom: 18 }}>
-              <div style={{ display: 'flex', gap: 8, flexDirection: 'row', alignItems: 'flex-end' }}>
-                <div style={{ flex: '0 0 100px', display: 'flex', flexDirection: 'column' }}>
-                  <select
-                    id="businessCountryCode"
-                    name="businessCountryCode"
-                    value={businessCountryCode}
-                    onChange={(e) => setBusinessCountryCode(e.target.value)}
-                    style={{
-                      width: '100%',
-                      fontSize: 17,
-                      height: 46,
-                      padding: '0 8px',
-                      borderRadius: 6,
-                      border: '1px solid #c3d0e8',
-                      marginBottom: 6,
-                      appearance: 'none',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none',
-                      lineHeight: 'normal',
-                    }}
-                    aria-label="Business Phone Country Code"
-                  >
-                    <option value="+1">+1</option>
-                    <option value="+44">+44</option>
-                    <option value="+61">+61</option>
-                    <option value="+65">+65</option>
-                    <option value="+81">+81</option>
-                    <option value="+91">+91</option>
-                    <option value="+353">+353</option>
-                    <option value="+49">+49</option>
-                    <option value="+33">+33</option>
-                    <option value="+962">+962</option>
-                    <option value="+966">+966</option>
-                    <option value="+971">+971</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <input
-                    placeholder="Business phone"
-                    type="tel"
-                    value={businessPhone}
-                    onChange={(e) => setBusinessPhone(e.target.value.replace(/\D/g, ''))}
-                    style={{
-                      width: '100%',
-                      fontSize: 17,
-                      padding: '12px 14px',
-                      borderRadius: 6,
-                      border: '1px solid #c3d0e8',
-                      marginBottom: 6,
-                    }}
-                  />
-                </div>
-              </div>
-              <div style={{ color: '#7b8ca6', fontSize: 13, marginTop: 2 }}>
-                Phone number for your business or operation.
-              </div>
-            </div>
-
-            {/* Website (optional) */}
-            <div className="form-group" style={{ marginBottom: 18 }}>
-              <input
-                type="text"
-                value={website}
-                onChange={(e) => setWebsite(e.target.value)}
-                placeholder="Website (optional)"
-                style={{
-                  width: '100%',
-                  fontSize: 17,
-                  padding: '12px 14px',
-                  borderRadius: 6,
-                  border: '1px solid #c3d0e8',
-                  marginBottom: 6,
-                }}
-              />
-              <div style={{ color: '#7b8ca6', fontSize: 13, marginTop: 2 }}>
-                Your business or personal website (optional).
-              </div>
-            </div>
-
-            {/* Business Address (REQUIRED: street/city/region/country) */}
-            <div className="form-group" style={{ marginBottom: 18 }}>
-              <div style={{ fontWeight: 600, fontSize: 15, color: '#2574d9', marginBottom: 8 }}>
-                Business Address
-              </div>
-
-              <input
-                type="text"
-                value={businessAddress.street}
-                onChange={(e) => setBusinessAddress({ ...businessAddress, street: e.target.value })}
-                onBlur={() => touch('street')}
-                placeholder="Street Address"
-                style={{
-                  width: '100%',
-                  fontSize: 17,
-                  padding: '12px 14px',
-                  borderRadius: 6,
-                  border: showStreetError ? '1px solid #e74c3c' : '1px solid #c3d0e8',
-                  marginBottom: 6,
-                }}
-                aria-required="true"
-              />
-              {showStreetError && <div className="fieldError">Street address is required.</div>}
-
-              <input
-                type="text"
-                value={businessAddress.city}
-                onChange={(e) => setBusinessAddress({ ...businessAddress, city: e.target.value })}
-                onBlur={() => touch('city')}
-                placeholder="City"
-                style={{
-                  width: '100%',
-                  fontSize: 17,
-                  padding: '12px 14px',
-                  borderRadius: 6,
-                  border: showCityError ? '1px solid #e74c3c' : '1px solid #c3d0e8',
-                  marginBottom: 6,
-                  marginTop: 6,
-                }}
-                aria-required="true"
-              />
-              {showCityError && <div className="fieldError">City is required.</div>}
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                <div style={{ flex: 1 }}>
-                  <input
-                    type="text"
-                    value={businessAddress.region}
-                    onChange={(e) => setBusinessAddress({ ...businessAddress, region: e.target.value })}
-                    onBlur={() => touch('region')}
-                    placeholder="State / Region"
-                    style={{
-                      width: '100%',
-                      fontSize: 17,
-                      padding: '12px 14px',
-                      borderRadius: 6,
-                      border: showRegionError ? '1px solid #e74c3c' : '1px solid #c3d0e8',
-                      marginBottom: 6,
-                    }}
-                    aria-required="true"
-                  />
-                  {showRegionError && <div className="fieldError">State / region is required.</div>}
-                </div>
-
-                <div style={{ flex: 1 }}>
-                  <input
-                    type="text"
-                    value={businessAddress.postalCode}
-                    onChange={(e) => setBusinessAddress({ ...businessAddress, postalCode: e.target.value })}
-                    placeholder="Postal Code (optional)"
-                    style={{
-                      width: '100%',
-                      fontSize: 17,
-                      padding: '12px 14px',
-                      borderRadius: 6,
-                      border: '1px solid #c3d0e8',
-                      marginBottom: 6,
-                    }}
-                  />
-                </div>
-              </div>
-
               <select
-                value={businessAddress.country}
-                onChange={(e) => setBusinessAddress({ ...businessAddress, country: e.target.value })}
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
                 onBlur={() => touch('country')}
                 style={{
                   width: '100%',
@@ -517,13 +291,13 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
                   borderRadius: 6,
                   border: showCountryError ? '1px solid #e74c3c' : '1px solid #c3d0e8',
                   marginBottom: 6,
-                  marginTop: 6,
                   appearance: 'none',
                   WebkitAppearance: 'none',
                   MozAppearance: 'none',
                   lineHeight: 'normal',
                 }}
                 aria-required="true"
+                required
               >
                 <option value="">Select country</option>
                 <option value="AU">Australia</option>
@@ -550,9 +324,8 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
                 <option value="US">United States</option>
               </select>
               {showCountryError && <div className="fieldError">Country is required.</div>}
-
               <div style={{ color: '#7b8ca6', fontSize: 13, marginTop: 2 }}>
-                Primary business location or headquarters
+                Used for routing, defaults, and future affiliate verification workflows.
               </div>
             </div>
 
@@ -561,7 +334,7 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Brief description of your business or services"
+                placeholder="Short description (optional)"
                 style={{
                   width: '100%',
                   fontSize: 16,
@@ -572,11 +345,29 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
                   marginBottom: 6,
                   resize: 'vertical',
                 }}
-                maxLength={400}
+                maxLength={500}
               />
               <div style={{ color: '#7b8ca6', fontSize: 13, marginTop: 2 }}>
-                Describe your business, specialties, or services (max 400 chars).
+                Optional for now. This can populate the affiliate profile later (max 500 chars).
               </div>
+            </div>
+
+            {/* Website (optional) */}
+            <div className="form-group" style={{ marginBottom: 18 }}>
+              <input
+                type="text"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="Website (optional)"
+                style={{
+                  width: '100%',
+                  fontSize: 17,
+                  padding: '12px 14px',
+                  borderRadius: 6,
+                  border: '1px solid #c3d0e8',
+                  marginBottom: 6,
+                }}
+              />
             </div>
 
             {/* Logo Upload (optional) */}
@@ -612,7 +403,6 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
                       borderRadius: 6,
                       padding: '7px 18px',
                       fontWeight: 600,
-                      marginLeft: 8,
                       cursor: 'pointer',
                       height: 40,
                       display: 'flex',
@@ -664,8 +454,7 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
               </div>
 
               <div style={{ color: '#7b8ca6', fontSize: 13, marginTop: 4 }}>
-                Accepted formats: PNG, JPEG, or SVG. Max size: 2MB. Square or landscape preferred. 200x200 px
-                (recommended).
+                Accepted formats: PNG, JPEG, or SVG. Max size: 2MB.
               </div>
             </div>
 
@@ -695,7 +484,6 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
 
               <button
                 type="submit"
-                className="primary-submit"
                 disabled={!canSubmit}
                 aria-disabled={!canSubmit}
                 style={{
@@ -736,7 +524,7 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
         </div>
       </div>
 
-      {/* Onboarding Status Card (Step Summary) */}
+      {/* Onboarding Status Card */}
       <div
         style={{
           background: '#f5f9ff',
@@ -761,43 +549,12 @@ const Step3ProfileSetup: React.FC<Step3ProfileSetupProps> = ({
           Email: <span style={{ fontWeight: 500 }}>{userEmail}</span>
         </div>
         <div style={{ marginBottom: 6 }}>
-          Phone: <span style={{ fontWeight: 500 }}>{identity?.phone || ''}</span>
-        </div>
-        <div style={{ marginBottom: 6 }}>
           Password Set: <span style={{ fontWeight: 500 }}>{passwordSet ? 'Yes' : 'No'}</span>
         </div>
         <div>
           Supabase Email Confirmed:{' '}
           <span style={{ fontWeight: 500 }}>{session?.user?.email_confirmed_at ? 'Yes' : 'No'}</span>
         </div>
-      </div>
-
-      {/* Session Debug Card (Dev Only) */}
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: 12,
-          boxShadow: '0 1px 4px #197de115',
-          padding: '1rem 1.5rem',
-          margin: '24px auto 0',
-          width: '100%',
-          maxWidth: 540,
-        }}
-      >
-        <div style={{ fontWeight: 600, marginBottom: 8, color: '#197de1' }}>Session Info (dev only):</div>
-        <pre
-          style={{
-            fontSize: 13,
-            color: '#223',
-            background: '#f7fafd',
-            borderRadius: 8,
-            padding: 12,
-            overflowX: 'auto',
-            margin: 0,
-          }}
-        >
-          {JSON.stringify(session, null, 2)}
-        </pre>
       </div>
 
       <style>{`

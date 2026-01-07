@@ -1,0 +1,35 @@
+/*
+  File: index.tsx
+  Path: CascadeProjects/aquorix-pro-admin/src/index.tsx src/index.tsx
+  Description: dashboard index file (?)
+
+  Author: Larry McLean + AI Team
+  Created: Tuesday, July 15, 2025
+  Version: 1.0.1
+
+  Last Updated: November 27, 2025
+  Status: Working
+
+  Change Log:
+    - 2025-11-27 - v1.0.1 (Author(s)): larry mcLean + ai team
+      - Update
+*/
+
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import './styles/AQXAdmin.css';
+import './styles/TopNav.css';
+import './styles/aqx-unified-style-guide.css';
+import './styles/AuthOnboarding.css';
+import './styles/dashboard.css';
+import App from './App';
+
+const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
+root.render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </React.StrictMode>
+);

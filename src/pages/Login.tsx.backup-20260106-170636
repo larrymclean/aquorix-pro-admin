@@ -1,7 +1,7 @@
 /*
  * ============================================================================
  * File:        Login.tsx
- * Version:     1.2.2
+ * Version:     
  * Path:        src/pages/Login.tsx
  * Project:     AQUORIX Pro Dashboard
  * ============================================================================
@@ -42,9 +42,6 @@
  * 
  * v1.2.1  2026-01-05 Larry McLean
  *   - Added console logging to track AQX Admin Login
- * 
- * v1.2.2 2026-01-06 Larry McLean + AI Team
- *  - Change admin routing from /admin to /admin/overview
  * 
  * ============================================================================
  */
@@ -150,7 +147,7 @@ const Login: React.FC = () => {
       if (meData.ok) {
         if (meData.routing_hint === 'admin') {
           console.log('[Login] Routing to admin');
-          navigate('/admin/overview', { replace: true });
+          navigate('/admin', { replace: true });
           return;
         }
 

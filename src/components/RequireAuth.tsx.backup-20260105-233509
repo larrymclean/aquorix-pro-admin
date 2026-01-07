@@ -1,7 +1,6 @@
 /*
  * ============================================================================
  * File:        RequireAuth.tsx
- * Version:     1.1.1
  * Path:        src/components/RequireAuth.tsx
  * Project:     AQUORIX Pro Dashboard
  * ============================================================================
@@ -43,10 +42,6 @@
  *   - Fetch /me once on mount (constraints do not trigger refetch)
  *   - Add clear backend-down state (do not mask as onboarding)
  *   - Professional logging output (no emoji)
- * 
- * v1.1.1 2026-01-06 - Larry McLean
- *   - Update role derivation section
- *   - Remove the admin redirect entirely
  * ============================================================================
  */
 
@@ -249,22 +244,7 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
 
         let role: string | null = null;
 
-        // v1.1.1 - Admin detection must NOT depend on routing_hint.
-        // Admin if tier_level == 0 OR internal_admin exists OR ui_mode == 'admin'
-        const tierLevelFromMe =
-          (meData as any)?.aquorix_user?.tier_level ??
-          (meData as any)?.tier_level ??
-          null;
-
-        const uiMode = (meData as any)?.ui_mode ?? null;
-        const hasInternalAdmin = Boolean((meData as any)?.internal_admin);
-
-        const isAdmin =
-          Number(tierLevelFromMe) === 0 ||
-          hasInternalAdmin ||
-          String(uiMode).toLowerCase() === 'admin';
-
-        if (isAdmin) {
+        if (routing_hint_raw === 'admin') {
           role = adminRoleRaw ? String(adminRoleRaw) : 'admin';
         } else {
           role = affiliation ? String(affiliation) : null;
@@ -373,6 +353,13 @@ const RequireAuth: React.FC<RequireAuthProps> = ({
   }
 
   // Backend routing authority: onboarding
+
+  if (ctx.routing_hint === 'admin') {
+    if (!location.pathname.startsWith('/admin')) {
+      return <Navigate to="/admin/overview" replace />;
+    }
+    // Already in /admin/*, allow children to render
+  }
 
   if (ctx.routing_hint === 'onboarding') {
     return <Navigate to="/onboarding" replace />;

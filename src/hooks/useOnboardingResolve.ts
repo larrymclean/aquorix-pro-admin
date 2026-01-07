@@ -1,6 +1,7 @@
 /*
  * ============================================================================
  * File:        useOnboardingResolve.ts
+ * Version:     1.1.1
  * Path:        src/hooks/useOnboardingResolve.ts
  * Project:     AQUORIX Pro Dashboard
  * ============================================================================
@@ -21,6 +22,7 @@
  *
  * Author:      AQUORIX Engineering
  * Created:     2025-09-13
+ * Updated:     2026-01-05
  *
  * Change Log (append-only):
  * --------------------------------------------------------------------------
@@ -31,6 +33,9 @@
  *   - Replace legacy resolver with single-source-of-truth /api/v1/me
  *   - Route strictly by routing_hint from backend
  *   - Remove all /by-supabase-id usage to prevent routing drift
+ * 
+ * v1.1.1 2026-01-05  Larry McLean
+ *  - Fix src/hooks/useOnboardingResolve.ts (FULL-FILE REPLACEMENT)
  * ============================================================================
  */
 
@@ -117,16 +122,37 @@ export function useOnboardingResolve(supabaseUser: SupabaseUser | null): UseOnbo
           return;
         }
 
-        // Single source of truth: routing_hint
-        if (data.routing_hint === "dashboard") {
+        // Single source of truth: routing_hint (DIR: include Tier 0 admin)
+        if (data?.routing_hint === "admin") {
           setIsResolved(true);
-          navigate("/dashboard");
+          navigate("/admin", { replace: true });
+          return;
+        }
+
+        if (data?.routing_hint === "dashboard") {
+          setIsResolved(true);
+          navigate("/dashboard", { replace: true });
+          return;
+        }
+
+        if (data?.routing_hint === "onboarding") {
+          setIsResolved(true);
+          navigate("/onboarding", { replace: true });
+          return;
+        }
+
+        // Fallbacks: if backend didn't provide a known routing_hint
+        if (data?.onboarding?.is_complete === true) {
+          setIsResolved(true);
+          navigate("/dashboard", { replace: true });
           return;
         }
 
         // Default: onboarding
         setIsResolved(true);
-        navigate("/onboarding");
+        navigate("/onboarding", { replace: true });
+
+
       } catch (err: any) {
         console.error("[useOnboardingResolve] Fatal resolver error:", err?.message || err);
         setError(err?.message || "Resolver failed");

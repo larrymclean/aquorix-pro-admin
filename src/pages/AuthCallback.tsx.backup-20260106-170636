@@ -1,22 +1,15 @@
 /*
  * File: AuthCallback.tsx
- * Path: src/pages/AuthCallback.tsx
+ * Path: CascadeProjects/aquorix-pro-admin/src/pages/AuthCallback.tsx
  * Description: Handles Supabase auth callback + routes user into app.
  * Author: AQUORIX Engineering
- * Version: 1.2.0
- * Last Updated: 2026-01-06
- *
- * CRITICAL FIX:
- * - Never hardcode /onboarding.
- * - If session exists, call /api/v1/me and route by routing_hint:
- *   admin -> /admin/overview
- *   dashboard -> /dashboard
- *   onboarding -> /onboarding
- * - If no session -> /login
+ * Version: 1.1.0
+ * Last Updated: 2026-01-03
  *
  * Notes:
  * - Dev mode React StrictMode may run effects twice; we guard with a ref.
  * - Keep UI stable (no oscillating messages).
+ * - Left panel is logo-only (no "Command the Depths" text).
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -25,14 +18,6 @@ import { supabase } from '../lib/supabaseClient';
 import '../styles/Auth.css';
 
 type Status = 'working' | 'done' | 'error';
-
-type MeResponse = {
-  ok?: boolean;
-  routing_hint?: 'admin' | 'dashboard' | 'onboarding' | string;
-  onboarding?: { is_complete?: boolean };
-};
-
-const ME_URL = 'http://localhost:3001/api/v1/me';
 
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();
@@ -50,72 +35,38 @@ const AuthCallback: React.FC = () => {
         setStatus('working');
         setMessage('Signing you in…');
 
+        // In most Supabase setups, the session is already established here if email was confirmed.
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
 
         const session = data?.session;
 
-        if (!session?.access_token) {
-          setStatus('error');
-          setMessage('No active session found. Please sign in.');
-          window.setTimeout(() => navigate('/login', { replace: true }), 400);
-          return;
-        }
-
-        // Backend is authority for routing
-        const res = await fetch(ME_URL, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store',
-          credentials: 'omit',
-        });
-
-        if (res.status === 401) {
-          setStatus('error');
-          setMessage('Session expired. Please sign in again.');
-          window.setTimeout(() => navigate('/login', { replace: true }), 450);
-          return;
-        }
-
-        if (!res.ok) {
-          throw new Error(`/me returned HTTP ${res.status}`);
-        }
-
-        const meData = (await res.json()) as MeResponse;
-
-        setStatus('done');
-
-        const hint = meData.routing_hint;
-
-        if (hint === 'admin') {
-          setMessage('Success. Routing to admin dashboard…');
-          window.setTimeout(() => navigate('/admin/overview', { replace: true }), 250);
-          return;
-        }
-
-        if (hint === 'dashboard') {
-          setMessage('Success. Routing to dashboard…');
-          window.setTimeout(() => navigate('/dashboard', { replace: true }), 250);
-          return;
-        }
-
-        if (hint === 'onboarding') {
+        if (session?.user?.id) {
+          setStatus('done');
           setMessage('Success. Continuing to onboarding…');
-          window.setTimeout(() => navigate('/onboarding', { replace: true }), 250);
+
+          // Give the UI a beat so it doesn’t look like a flash/flicker.
+          window.setTimeout(() => {
+            navigate('/onboarding', { replace: true });
+          }, 350);
+
           return;
         }
 
-        // Safe fallback
-        setMessage('Success. Continuing…');
-        window.setTimeout(() => navigate('/login', { replace: true }), 300);
+        // No session: user likely needs to sign in again.
+        setStatus('error');
+        setMessage('No active session found. Please sign in.');
+
+        window.setTimeout(() => {
+          navigate('/login', { replace: true });
+        }, 600);
       } catch (err: any) {
         console.error('[AuthCallback] error:', err);
         setStatus('error');
         setMessage(err?.message || 'Authentication failed. Please sign in again.');
-        window.setTimeout(() => navigate('/login', { replace: true }), 500);
+        window.setTimeout(() => {
+          navigate('/login', { replace: true });
+        }, 800);
       }
     };
 
@@ -133,7 +84,7 @@ const AuthCallback: React.FC = () => {
         boxShadow: '0 2px 16px rgba(0,0,0,0.04)',
         marginTop: 40,
         maxWidth: 800,
-        margin: '40px auto 0',
+        margin: '40px auto 0'
       }}
     >
       {/* Left Branding Panel (logo-only) */}
@@ -144,7 +95,7 @@ const AuthCallback: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'center'
         }}
       >
         <img src="/aqx-ctd-logo.svg" alt="AQUORIX Logo" style={{ width: 140, height: 140 }} />
@@ -158,7 +109,7 @@ const AuthCallback: React.FC = () => {
           padding: '36px 32px',
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
+          justifyContent: 'center'
         }}
       >
         <div
@@ -168,15 +119,23 @@ const AuthCallback: React.FC = () => {
             color: '#2574d9',
             marginBottom: 8,
             letterSpacing: 0.5,
-            textAlign: 'center',
+            textAlign: 'center'
           }}
         >
           {status === 'error' ? 'Sign-in issue' : 'Finishing sign-in'}
         </div>
 
-        <div style={{ color: '#111827', fontSize: 16, marginBottom: 14, textAlign: 'center' }}>{message}</div>
+        <div style={{ color: '#111827', fontSize: 16, marginBottom: 14, textAlign: 'center' }}>
+          {message}
+        </div>
 
-        <div style={{ textAlign: 'center', fontSize: 13, color: '#64748b' }}>
+        <div
+          style={{
+            textAlign: 'center',
+            fontSize: 13,
+            color: '#64748b'
+          }}
+        >
           (If this doesn’t continue automatically, go back to{' '}
           <a href="/login" style={{ color: '#2574d9', textDecoration: 'none', fontWeight: 600 }}>
             Sign In

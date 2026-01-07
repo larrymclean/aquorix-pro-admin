@@ -1,69 +1,59 @@
 /*
   File: AQXAdminLayout.tsx
   Path: src/layouts/AQXAdminLayout.tsx
-  Description: Main layout for AQUORIX Admin Dashboard. Sidebar, top nav, and content wrapper.
-  Author: AQUORIX Engineering
+  Description: Admin layout shell for AQUORIX Admin routes. Sidebar + TopNav + routed content via <Outlet />.
+
+  Author: Larry McLean + AI Team
   Created: 2025-07-07
-  Last Updated: 2025-07-07
-  Status: MVP, production-ready
-  Dependencies: React, SidebarNavigation, TopNav, AdminContent
-  Notes: Minimal, update as layout evolves.
+  Version: 2.0.0
+
+  Last Updated: 2026-01-06
+  Status: MVP+ (correct routing architecture)
+
+  Dependencies:
+  - react-router-dom Outlet
+  - ThemeProvider + UserContext (tier-driven theme)
+  - SidebarNavigation, TopNav
+
+  Notes:
+  - CRITICAL FIX: This layout MUST NOT render legacy AdminContent directly.
+  - Routed pages now render via <Outlet /> (e.g., /admin, /admin/system-health)
+
   Change Log:
-    - 2025-07-07, AQUORIX Engineering: Initial MVP layout.
+    - 2026-01-06 - v2.0.0 (Author(s)): Larry McLean + AI Team
+      - Replace legacy <AdminContent /> rendering with <Outlet />
+      - Stabilize imports (remove duplicates)
+      - Preserve tier-based theme selection
 */
 
 import React from 'react';
+import { Outlet } from 'react-router-dom';
+
 import SidebarNavigation from '../components/SidebarNavigation';
 import TopNav from '../components/TopNav';
-import AdminContent from '../components/AdminContent';
-import '../styles/AQXAdmin.css';
-import '../styles/TopNav.css';
-
-/*
-  File: AQXAdminLayout.tsx
-  Path: src/layouts/AQXAdminLayout.tsx
-  Description: Main layout for AQUORIX Admin Dashboard. Sidebar, top nav, and content wrapper. Now theme-aware via ThemeProvider.
-  Author: AQUORIX Engineering
-  Created: 2025-07-07
-  Last Updated: 2025-07-09
-  Status: MVP, theme integration
-  Dependencies: React, ThemeProvider, SidebarNavigation, TopNav, AdminContent
-  Notes: Now wraps children in ThemeProvider for theme context.
-  Change Log:
-    - 2025-07-09, AQUORIX Engineering: Wrap in ThemeProvider for theme context (marina).
-    - 2025-07-07, AQUORIX Engineering: Initial MVP layout.
-*/
 
 import { ThemeProvider } from '../components/ThemeProvider';
 import { useUser } from '../components/UserContext';
 import { getThemeByTier } from '../theme.config';
 
-/*
-  File: AQXAdminLayout.tsx
-  Path: src/layouts/AQXAdminLayout.tsx
-  Description: Main layout for AQUORIX Admin Dashboard. Sidebar, top nav, and content wrapper. Now theme-aware via ThemeProvider and dynamic user tier.
-  Author: AQUORIX Engineering
-  Created: 2025-07-07
-  Last Updated: 2025-07-09
-  Status: MVP, dynamic theme integration
-  Dependencies: React, ThemeProvider, UserContext, SidebarNavigation, TopNav, AdminContent
-  Notes: Dynamically selects theme based on user tier. Requires UserProvider upstream.
-  Change Log:
-    - 2025-07-09, AQUORIX Engineering: Dynamic theme selection via user tier.
-    - 2025-07-09, AQUORIX Engineering: Wrap in ThemeProvider for theme context (static).
-    - 2025-07-07, AQUORIX Engineering: Initial MVP layout.
-*/
+import '../styles/AQXAdmin.css';
+import '../styles/TopNav.css';
 
 const AQXAdminLayout: React.FC = () => {
   const { tier } = useUser();
-  const themeKey = getThemeByTier(tier).name === 'Bamboo Safari' ? 'bamboo' : 'marina'; // Defensive: ensure correct key
+
+  // Keep your existing defensive mapping (Tier 0 should not accidentally get affiliate themes)
+  const themeName = getThemeByTier(tier).name;
+  const themeKey = themeName === 'Bamboo Safari' ? 'bamboo' : 'marina';
+
   return (
     <ThemeProvider themeKey={themeKey}>
       <div className="aqx-admin-layout">
         <SidebarNavigation />
         <div className="content-wrapper">
           <TopNav />
-          <AdminContent />
+          {/* Routed admin pages render here */}
+          <Outlet />
         </div>
       </div>
     </ThemeProvider>

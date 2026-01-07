@@ -1,0 +1,100 @@
+/*
+ File: App.tsx
+ Path: src/App.tsx
+ Description: Main entry for AQUORIX Pro/Admin Dashboard. Sets up routing and authentication guards for all app routes.
+ Author: AQUORIX Engineering
+ Version: 1.4.0
+ Created: 2025-07-07
+ Last Updated: 2026-01-06
+ Status: Production, RBAC refactored
+ Dependencies: React, React Router DOM
+ Notes:
+ - CRITICAL FIX (2026-01-06): Convert /admin routing to true nested routes so AQXAdminLayout <Outlet /> renders child pages.
+ - AdminOverview is now the canonical landing page for /admin and /admin/overview.
+*/
+
+import React from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+
+import AQXAdminLayout from './layouts/AQXAdminLayout';
+import AdminOverview from './pages/admin/AdminOverview';
+import SystemHealth from './pages/admin/SystemHealth';
+
+import { ADMIN_DASHBOARD_ROLES } from './routes.config';
+
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Onboarding from './pages/Onboarding';
+import SetPassword from './pages/SetPassword';
+import RequireAuth from './components/RequireAuth';
+
+import { SystemHealthLogProvider } from './context/SystemHealthLogContext';
+
+import ProDashboardShell from './features/dashboard/ProDashboardShell';
+import ProDashboardMock from './features/dashboard/ProDashboardMock';
+import SchedulePage from './features/dashboard/pages/SchedulePage';
+
+import AuthCallback from './pages/AuthCallback';
+
+import './styles/AQXAdmin.css';
+
+function App() {
+  // DEBUG: Confirm running source
+  const debugBanner = null;
+
+  return (
+    <SystemHealthLogProvider>
+      {debugBanner}
+      <Routes>
+        {/* Auth callback landing (email confirm / magic link / etc.) */}
+        <Route path="/" element={<AuthCallback />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/set-password" element={<SetPassword />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+
+        {/* -----------------------------
+            Admin routes (Tier 0) - PROTECTED + NESTED
+            ----------------------------- */}
+        <Route
+          element={
+            <RequireAuth allowedRoles={ADMIN_DASHBOARD_ROLES}>
+              <Outlet />
+            </RequireAuth>
+          }
+        >
+          {/* Parent admin route: AQXAdminLayout provides Sidebar/TopNav and renders children via <Outlet /> */}
+          <Route path="/admin" element={<AQXAdminLayout />}>
+            {/* /admin -> AdminOverview */}
+            <Route index element={<AdminOverview />} />
+
+            {/* /admin/overview -> AdminOverview */}
+            <Route path="overview" element={<AdminOverview />} />
+
+            {/* /admin/system-health -> SystemHealth */}
+            <Route path="system-health" element={<SystemHealth />} />
+          </Route>
+        </Route>
+
+        {/* Dashboard – temporarily public for UI build */}
+        <Route path="/dashboard" element={<ProDashboardShell />}>
+          <Route index element={<ProDashboardMock />} />
+          <Route path="schedule" element={<SchedulePage />} />
+        </Route>
+
+        {/* Not Authorized route */}
+        <Route
+          path="/not-authorized"
+          element={React.createElement(require('./pages/NotAuthorized').default)}
+        />
+
+        {/* Default: send unknown routes to callback (so confirmations don't get bounced to /login prematurely) */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </SystemHealthLogProvider>
+  );
+}
+
+export default App;
