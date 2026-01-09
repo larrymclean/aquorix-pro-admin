@@ -122,19 +122,6 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
   // Phase C.1: Render flat list (no group headings)
   const flatItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
-  const isSettingsNavItem = (item: ResolvedItem) => {
-    const label = (item.label || '').toLowerCase();
-    const path = (item.path || '').toLowerCase();
-    const key = (item.iconKey || '').toLowerCase();
-
-    return (
-      key === 'settings' ||
-      label === 'settings' ||
-      path.includes('/settings') ||
-      path.endsWith('settings')
-    );
-  };
-
   return (
     <div
       className={[

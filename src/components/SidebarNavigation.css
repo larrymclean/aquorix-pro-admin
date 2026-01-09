@@ -1,99 +1,227 @@
 /*
   File: SidebarNavigation.css
   Path: src/components/SidebarNavigation.css
-  Description: Sidebar navigation styles for AQUORIX Admin Dashboard. MVP and responsive tweaks.
-  Author: AQUORIX Engineering
-  Created: 2025-07-07
-  Last Updated: 2025-07-07
-  Status: MVP, production-ready
-  Dependencies: None
-  Notes: Add mobile hide logic for sidebar.
+  Description: Phase C sidebar navigation (aqx-sidenav-*) — MVP pixel parity
+               IMPORTANT: One canonical definition for pills (no duplicates).
+  Author: Larry McLean + AI Team
+  Created: 2026-01-08
+  Version: 1.1.0
+  Last Updated: 2026-01-09
+
   Change Log:
-    - 2025-07-07, AQUORIX Engineering: Initial MVP and mobile hide.
+    - 2026-01-09 - v1.1.0 (AI Team + Larry):
+      - Remove duplicate/conflicting rules
+      - MVP pill spacing (8/14 padding, 4/10 margin, radius 6)
+      - Sidebar container transparent; shell owns background
+      - Collapsed behavior parity
 */
 
-.sidebar {
-  width: 240px;
-  height: 100vh;
-  background-color: #001C34;
-  color: #F5F6F5;
+/* Container: transparent; aside.aqx-sidebar owns background */
+.aqx-sidenav {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 20px 0;
-  position: fixed;
-  top: 0;
-  left: 0;
+  padding: 0;              /* CRITICAL: avoid double-indent */
+  background: transparent; /* CRITICAL */
+  color: #ffffff;
 }
 
-@media (max-width: 600px) {
-  .sidebar {
-    display: none !important;
-  }
+/* MVP has no top header branding in sidebar */
+.aqx-sidenav__header {
+  display: none !important;
 }
 
-
-.sidebar__header {
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px 0;
-  color: #00D4FF;
-  width: 100%;
+.aqx-sidenav__nav {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 0 16px; /* MVP spacing */
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
-.sidebar-logo {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
+.aqx-sidenav__loading {
+  padding: 12px 14px;
+  opacity: 0.85;
+  color: #ffffff;
 }
 
-.sidebar-title {
-  font-size: 20px;
-  font-weight: bold;
-  text-align: center;
-  color: #FFFFFF; /* Default white or React/Aq Blue? 00D4FF */
-}
-
-.sidebar nav ul {
+.aqx-sidenav__list {
   list-style: none;
-  padding: 0;
   margin: 0;
-  width: 100%;
+  padding: 0;
+  background: transparent !important;
 }
 
-.sidebar nav ul li {
-  margin: 10px 0;
-  width: 100%;
+/* Pill item wrapper (no extra margins here) */
+.aqx-sidenav__item {
+  margin: 0;
+  padding: 0;
 }
 
-.sidebar nav ul li a {
+/* MVP pill (matches HTML .sidebar-item) */
+.aqx-sidenav__link {
   display: flex;
   align-items: center;
-  color: #F5F6F5;
+  justify-content: flex-start; /* KEY: left align */
+  gap: 10px;
+
+  padding: 8px 14px;  /* MVP */
+  margin: 4px 10px;   /* MVP */
+  border-radius: 6px; /* MVP */
+
   text-decoration: none;
-  padding: 10px 32px;
-  transition: background 0.2s ease;
-  border-radius: 8px;
-  width: 100%;
-  max-width: 176px;
-  margin: 0 auto;
-  justify-content: flex-start;
-}
-
-.sidebar nav ul li a:hover,
-.sidebar nav ul li.active a {
-  background-color: #248dc1;
-  color: #FFFFFF;
-}
-
-.sidebar .icon {
-  margin-right: 12px;
-  display: flex;
-  align-items: center;
-}
-
-.sidebar .label {
+  color: #ffffff;
   font-size: 14px;
+
+  background: transparent;
+  border: none;
+  cursor: pointer;
+
+  box-sizing: border-box;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.aqx-sidenav__link:hover {
+  background: var(--sidebar-pill-hover, rgba(240, 249, 255, 0.18));
+}
+
+.aqx-sidenav__item.is-active .aqx-sidenav__link {
+  background: var(--sidebar-pill-active, rgba(240, 249, 255, 0.32));
+  color: #ffffff;
+}
+
+/* Icon container */
+.aqx-sidenav__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  flex-shrink: 0;
+}
+
+/* Lucide svg parity */
+.aqx-sidenav__icon svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+  stroke: currentColor;
+  display: block;
+}
+
+/* Label */
+.aqx-sidenav__label {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Disabled */
+.aqx-sidenav__link.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Toggle button (styled like MVP pill) */
+.aqx-sidebar-toggle {
+  align-self: flex-start;
+  margin: 6px 10px 8px 10px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  transition: background 0.15s ease;
+}
+
+.aqx-sidebar-toggle:hover {
+  background: var(--sidebar-pill-hover, rgba(240, 249, 255, 0.18));
+}
+
+.aqx-sidebar-toggle svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+/* Brand footer (MVP) */
+.aqx-sidenav__brand-footer {
+  margin-top: auto;
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: transparent !important;
+  border: none !important;
+}
+
+.aqx-sidenav__brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  color: #ffffff;
+  font-family: "Avenir Next", system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  margin-bottom: 0px;
+}
+
+.aqx-brand-icon {
+  width: 26px;
+  height: 22px;
+  display: block;
+}
+
+.aqx-sidenav__tagline {
+  color: #ffffff;
+  font-size: 12px;
   font-weight: 500;
+  text-align: center;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.aqx-sidenav__version {
+  color: #ffffff;
+  font-size: 10px;
+  text-align: center;
+  margin-top: 4px;
+  opacity: 1.0;
+}
+
+/* Collapsed parity */
+.aqx-sidenav--collapsed .aqx-sidenav__link {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.aqx-sidenav--collapsed .aqx-sidenav__label {
+  display: none;
+}
+
+.aqx-sidenav--collapsed .aqx-sidebar-toggle {
+  align-self: stretch;
+  width: 100%;
+  margin: 6px 0 8px 0;
+  padding: 6px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.aqx-sidenav--collapsed .aqx-sidenav__brand span,
+.aqx-sidenav--collapsed .aqx-sidenav__tagline,
+.aqx-sidenav--collapsed .aqx-sidenav__version {
+  display: none;
+}
+
+.aqx-sidenav--collapsed .aqx-brand-icon {
+  width: 24px;
+  height: 20px;
 }

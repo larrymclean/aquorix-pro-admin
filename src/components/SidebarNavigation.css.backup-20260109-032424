@@ -1,0 +1,322 @@
+/*
+  File: SidebarNavigation.css
+  Path: src/components/SidebarNavigation.css
+  Description: Styles for Phase C dynamic sidebar navigation (aqx-sidenav-*).
+               IMPORTANT: Avoids legacy .sidebar collisions.
+  Author: Larry McLean + AI Team
+  Created: 2026-01-08
+  Version: 1.0.0
+*/
+
+.aqx-sidenav {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 10px 12px 10px;
+  color: inherit;
+}
+
+.aqx-sidenav__header {
+  display: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.aqx-sidenav__logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+}
+
+.aqx-sidenav__title {
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.aqx-sidenav__nav {
+  flex: 1;
+  overflow: auto;
+}
+
+.aqx-sidenav__loading {
+  padding: 12px 8px;
+  opacity: 0.8;
+}
+
+.aqx-sidenav__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.aqx-sidenav__group {
+  margin: 12px 0 6px 0;
+  padding: 0 8px;
+  font-size: 12px;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.aqx-sidenav__item {
+  margin: 2px 0;
+}
+
+.aqx-sidenav__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.aqx-sidenav__item.is-active .aqx-sidenav__link {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.aqx-sidenav__icon {
+  width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Phase C.1: lucide icon sizing */
+.aqx-sidenav__svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+  display: block;
+}
+
+/* Phase C.1: dot placeholder removed (real icons now) */
+.aqx-sidenav__dot {
+  display: none !important;
+}
+
+.aqx-sidenav__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aqx-sidenav__badge {
+  margin-left: 8px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.aqx-sidenav__item.is-disabled .aqx-sidenav__link {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.aqx-sidenav__footer {
+  padding-top: 10px;
+}
+
+.aqx-sidenav__toggle {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+}
+
+/* Phase C.1: brand footer */
+.aqx-sidenav__brand-footer {
+  margin-top: auto;
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.aqx-sidenav__brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 400;
+  margin-bottom: 4px;
+}
+
+.aqx-brand-icon {
+  width: 26px;
+  height: 22px;
+  display: block;
+}
+
+.aqx-sidenav__tagline {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.aqx-sidenav__version {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* Collapsed state: hide footer text */
+.aqx-sidenav--collapsed .aqx-sidenav__brand span,
+.aqx-sidenav--collapsed .aqx-sidenav__tagline,
+.aqx-sidenav--collapsed .aqx-sidenav__version {
+  display: none;
+}
+
+.aqx-sidenav--collapsed .aqx-brand-icon {
+  width: 24px;
+  height: 20px;
+}
+
+/* Phase C.1: inner containers must not paint a lighter panel */
+.aqx-sidenav__nav,
+.aqx-sidenav__list {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+.aqx-sidenav__footer {
+  background: transparent !important;
+}
+
+/* Toggle button styling (matches HTML MVP prototype class name) */
+.aqx-sidebar-toggle {
+  align-self: flex-start;
+  margin: 6px 10px 8px 10px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.aqx-sidebar-toggle:hover {
+  background: rgba(240, 249, 255, 0.18);
+}
+
+.aqx-sidebar-toggle svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+/* Center toggle chevron when sidebar is collapsed */
+.aqx-sidenav--collapsed .aqx-sidebar-toggle {
+  align-self: stretch;
+  width: 100%;
+  margin: 6px 0 8px 0;
+  padding: 6px 0;
+  display: flex;
+  justify-content: center;
+}
+
+/* ------------------------------------------------------------
+   Phase C.1 Parity: MVP "sidebar-item" pill layout
+   React uses: .aqx-sidenav__link / __icon / __label
+------------------------------------------------------------ */
+
+/* Ensure list doesn't center items */
+.aqx-sidenav__list {
+  padding: 8px 0 16px;
+  margin: 0;
+  list-style: none;
+}
+
+/* The clickable pill (MVP .sidebar-item) */
+.aqx-sidenav__link {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;  /* KEY: left align */
+  gap: 10px;                    /* MVP */
+  padding: 8px 14px;            /* MVP */
+  margin: 4px 10px;             /* MVP */
+  border-radius: 6px;           /* MVP */
+  text-decoration: none;
+  color: #ffffff;
+  font-size: 14px;
+  background: transparent;
+  border: none;
+  width: calc(100% - 20px);     /* matches margin left+right (10px + 10px) */
+  box-sizing: border-box;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* Hover + Active parity (use same values as your HTML prototype tokens) */
+.aqx-sidenav__link:hover {
+  background: rgba(240, 249, 255, 0.18); /* MVP --sidebar-pill-hover */
+}
+
+.aqx-sidenav__item.is-active .aqx-sidenav__link {
+  background: rgba(240, 249, 255, 0.32); /* MVP --sidebar-pill-active */
+  color: #ffffff;
+}
+
+/* Icon sizing parity */
+.aqx-sidenav__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+}
+
+.aqx-sidenav__icon svg,
+.aqx-sidenav__svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+  stroke: currentColor;
+  display: block;
+}
+
+/* Label should not center; keep left flow */
+.aqx-sidenav__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  line-height: 1;
+}
+
+/* Disabled state stays pill-like */
+.aqx-sidenav__link.is-disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------
+   Collapsed behavior parity:
+   center icons + hide labels (like MVP .aqx-sidebar--collapsed)
+------------------------------------------------------------ */
+.aqx-sidenav--collapsed .aqx-sidenav__link {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+  margin-left: 6px;
+  margin-right: 6px;
+  width: calc(100% - 12px);
+}
+
+.aqx-sidenav--collapsed .aqx-sidenav__label {
+  display: none;
+}
+

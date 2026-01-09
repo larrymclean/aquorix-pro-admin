@@ -2,9 +2,9 @@
  * ============================================================================
  * AQUORIX API -
  * ============================================================================
- * File:        src/components/TopNav.tsx
+ * File:        src/features/dashboard/components/TopNav.tsx
  * Purpose:     Top nav (brand + actions).
- * Version:     v1.0.2
+ * Version:     v1.0.1
  * Created:     2025-12-29
  * Updated:     2026-01-07
  * Author:      Larry McLean
@@ -12,20 +12,16 @@
  *
  * Description:
  * - Top navigation bar for dashboard shell
- * - Displays brand identity (operator > affiliate > user display)
- * - Uses /api/v1/me as the single boot authority (canonical keys)
+ * - Displays brand identity (operator > user display)
+ * - Uses /api/v1/me as the single boot authority
  *
  * Change Log:
  * -----------
- * v1.?.?  - 12-29-25 - Locked branding logic...
- * v1.0.1  - 2026-01-07 - Larry McLean & ChatGPT
+ * v1.?.? - 12-29-25 - Locked branding logic...
+ * v1.0.1 - 2026-01-07 - Larry McLean & ChatGPT
  *   - Refactor to canonical /api/v1/me keys (user.display_name, user.avatar_url, operator.name/logo_url)
  *   - Remove direct Supabase session fetch from TopNav (uses getMe via api helper)
  *   - Keep branding precedence: operator > user
- * v1.0.2  - 2026-01-07 - Larry McLean & ChatGPT
- *   - Fix header File path to match actual location (src/components/TopNav.tsx)
- *   - Add optional prop override to avoid duplicate /me fetch (Layout can pass me)
- *   - Keep safe fallback: fetch /me only if override not provided
  *
  * Notes:
  * - Do NOT alter existing changelog entries
@@ -36,9 +32,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Bell, HelpCircle, User as UserIcon } from 'lucide-react';
-import { getMe } from '../utils/api';
+import { getMe } from '../../../utils/api';
 
-export type MeResponse = {
+type MeResponse = {
   api_version?: string;
   ok: boolean;
   authenticated: boolean;
@@ -53,8 +49,6 @@ export type MeResponse = {
     avatar_url?: string | null;
   };
 
-  permissions?: Record<string, boolean>; // <-- ADD THIS LINE 2026-01-08
-
   operator?: {
     operator_id?: number | string | null;
     name?: string | null;
@@ -66,19 +60,6 @@ export type MeResponse = {
     name?: string | null;
     logo_url?: string | null;
   };
-};
-
-type TopNavProps = {
-  /**
-   * Optional: Provide /api/v1/me payload from a parent (Layout/Provider)
-   * to avoid duplicate /me fetches.
-   */
-  meOverride?: MeResponse | null;
-
-  /**
-   * Optional: If parent is fetching /me, pass loading state for skeleton UI.
-   */
-  loadingOverride?: boolean;
 };
 
 function safeInitials(displayName?: string | null, email?: string | null) {
@@ -93,34 +74,31 @@ function safeInitials(displayName?: string | null, email?: string | null) {
   return 'A';
 }
 
-const TopNav: React.FC<TopNavProps> = ({ meOverride, loadingOverride }) => {
-  const [meLocal, setMeLocal] = useState<MeResponse | null>(null);
-  const [loadingLocal, setLoadingLocal] = useState<boolean>(true);
-
-  const me = meOverride !== undefined ? meOverride : meLocal;
-  const loading = loadingOverride !== undefined ? loadingOverride : loadingLocal;
+const TopNav: React.FC = () => {
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    // If parent provides me, do not fetch here.
-    if (meOverride !== undefined) return;
-
     let mounted = true;
 
     async function loadMe() {
-      setLoadingLocal(true);
+      setLoading(true);
       try {
         const data = (await getMe()) as MeResponse;
 
+        // Debug 01-07-2026
+        console.log('[TopNav] /me data:', data);
+        
         if (mounted) {
-          setMeLocal(data);
+          setMe(data);
         }
       } catch (err) {
         console.error('[TopNav] getMe failed:', err);
         if (mounted) {
-          setMeLocal(null);
+          setMe(null);
         }
       } finally {
-        if (mounted) setLoadingLocal(false);
+        if (mounted) setLoading(false);
       }
     }
 
@@ -129,7 +107,7 @@ const TopNav: React.FC<TopNavProps> = ({ meOverride, loadingOverride }) => {
     return () => {
       mounted = false;
     };
-  }, [meOverride]);
+  }, []);
 
   const brand = useMemo(() => {
     const userEmail = me?.user?.email ?? null;

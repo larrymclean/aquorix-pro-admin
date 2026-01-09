@@ -1,0 +1,191 @@
+/*
+  File: SidebarNavigation.tsx
+  Path: src/components/SidebarNavigation.tsx
+  Description: Phase C sidebar navigation driven by /api/v1/me (ui_mode + permissions).
+               Sidebar reflects permissions; it does not enforce authorization.
+
+  Author: Larry McLean + AI Team
+  Created: 2025-07-07
+  Version: 2.2.2
+
+  Last Updated: 2026-01-08
+  Status: Active (Phase C dynamic nav)
+
+  Dependencies:
+  - react
+  - react-router-dom
+  - ThemeProvider (useTheme) [safe fallback]
+  - src/config/navigation (resolveVisibleNav)
+
+  Notes:
+  - Single boot call invariant: Sidebar MUST NOT fetch /api/v1/me.
+  - tier_level is display-only; gating uses permissions only.
+  - Hide is default unauthorized behavior; disabled allowed for upsell/coming soon.
+  - IMPORTANT: Uses aqx-sidenav-* classnames to avoid collisions with legacy .sidebar CSS.
+
+  Change Log:
+    - 2026-01-08 - v2.2.2 (Larry McLean + AI Team)
+      - Remove hook-rule violations (useTheme called at top-level only)
+      - Rename CSS classes to aqx-sidenav-* to prevent Pro dashboard style collisions
+      - Render neutral root <div> so shells own the sidebar container element
+*/
+
+import React, { useMemo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+
+import './SidebarNavigation.css';
+import { useTheme } from './ThemeProvider';
+
+import type { UiMode, Permissions, NavItem } from '../config/navigation';
+import { resolveVisibleNav } from '../config/navigation';
+
+export type SidebarNavigationProps = {
+  uiMode: UiMode;
+  permissions: Permissions;
+
+  // Controlled collapse (parent owns state)
+  isCollapsed?: boolean;
+  onToggle?: () => void;
+
+  // Optional UI state
+  loading?: boolean;
+};
+
+type ResolvedItem = NavItem & { isDisabled?: boolean; reason?: string };
+
+function isActivePath(currentPath: string, itemPath: string) {
+  return currentPath === itemPath;
+}
+
+const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
+  uiMode,
+  permissions,
+  isCollapsed = false,
+  onToggle,
+  loading = false,
+}) => {
+  // Hook MUST be top-level (no callbacks / try-catch wrappers).
+  // ThemeProvider.useTheme() is now safe-fallback; no throw.
+  const theme = useTheme();
+
+  const location = useLocation();
+
+  const groups = useMemo(() => {
+    try {
+      return resolveVisibleNav(uiMode, permissions);
+    } catch (err) {
+      console.error('[SidebarNavigation] resolveVisibleNav failed:', err);
+      return [];
+    }
+  }, [uiMode, permissions]);
+
+  const title =
+    uiMode === 'admin'
+      ? 'AQUORIX Admin'
+      : uiMode === 'affiliate'
+        ? 'AQUORIX Partner'
+        : 'AQUORIX Pro';
+
+  return (
+    <div
+      className={[
+        'aqx-sidenav',
+        theme?.cssClass ? theme.cssClass : '',
+        isCollapsed ? 'aqx-sidenav--collapsed' : '',
+      ].join(' ').trim()}
+    >
+      <div className="aqx-sidenav__header">
+        <img
+          src="/aqx-ctd-logo.svg" //src="/aqx-square-naut-white-96x96.svg"
+          alt="AQUORIX Logo"
+          className="aqx-sidenav__logo"
+        />
+        {!isCollapsed && <span className="aqx-sidenav__title">{title}</span>}
+      </div>
+
+      <nav className="aqx-sidenav__nav" aria-label="Sidebar navigation">
+        {loading ? (
+          <div className="aqx-sidenav__loading">{!isCollapsed ? 'Loading…' : '…'}</div>
+        ) : (
+          <ul className="aqx-sidenav__list">
+            {groups.map((group) => (
+              <React.Fragment key={`${uiMode}:${group.group}`}>
+                {!isCollapsed && group.group ? (
+                  <li className="aqx-sidenav__group">{group.group}</li>
+                ) : null}
+
+                {group.items.map((item: ResolvedItem) => {
+                  const active = isActivePath(location.pathname, item.path);
+
+                  if (item.isDisabled) {
+                    return (
+                      <li
+                        key={item.path}
+                        className={[
+                          'aqx-sidenav__item',
+                          active ? 'is-active' : '',
+                          'is-disabled',
+                        ].join(' ').trim()}
+                      >
+                        <div
+                          className="aqx-sidenav__link is-disabled"
+                          title={item.reason || 'Unavailable'}
+                          aria-disabled="true"
+                        >
+                          <span className="aqx-sidenav__icon" aria-hidden="true">
+                            <span className="aqx-sidenav__dot" />
+                          </span>
+
+                          {!isCollapsed && (
+                            <span className="aqx-sidenav__label">
+                              {item.label}
+                              <span className="aqx-sidenav__badge">
+                                {item.reason || 'Unavailable'}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  }
+
+                  return (
+                    <li
+                      key={item.path}
+                      className={[
+                        'aqx-sidenav__item',
+                        active ? 'is-active' : '',
+                      ].join(' ').trim()}
+                    >
+                      <Link to={item.path} className="aqx-sidenav__link">
+                        <span className="aqx-sidenav__icon" aria-hidden="true">
+                          <span className="aqx-sidenav__dot" />
+                        </span>
+                        {!isCollapsed && <span className="aqx-sidenav__label">{item.label}</span>}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+          </ul>
+        )}
+      </nav>
+
+      {onToggle ? (
+        <div className="aqx-sidenav__footer">
+          <button
+            type="button"
+            className="aqx-sidenav__toggle"
+            onClick={onToggle}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? '›' : '‹'}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+export default SidebarNavigation;

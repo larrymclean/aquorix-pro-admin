@@ -1,0 +1,181 @@
+/*
+  File: SidebarNavigation.tsx
+  Path: src/components/SidebarNavigation.tsx
+  Description: Phase C sidebar navigation driven by /api/v1/me (ui_mode + permissions).
+               Sidebar reflects permissions; it does not enforce authorization.
+
+  Author: Larry McLean + AI Team
+  Created: 2025-07-07
+  Version: 2.2.0
+
+  Last Updated: 2026-01-08
+  Status: Active (Phase C dynamic nav)
+
+  Dependencies:
+  - react
+  - react-router-dom
+  - ThemeProvider (useTheme)
+  - src/config/navigation (resolveVisibleNav)
+
+  Notes:
+  - Single boot call invariant: Sidebar MUST NOT fetch /api/v1/me.
+  - tier_level is display-only; gating uses permissions only.
+  - Hide is default unauthorized behavior; disabled allowed for upsell/coming soon.
+
+  Change Log:
+    - 2025-07-09, AQUORIX Engineering: Refactor for theme context integration.
+    - 2026-01-08 - v2.2.0 (Larry McLean + AI Team)
+      - Convert sidebar to Phase C dynamic nav driven by ui_mode + permissions
+      - Add grouped nav rendering + hide/disabled handling
+      - Add controlled collapse support (isCollapsed/onToggle) + loading state
+*/
+
+import React, { useMemo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+
+import './SidebarNavigation.css';
+import { useTheme } from './ThemeProvider';
+
+import type { UiMode, Permissions, NavItem } from '../config/navigation';
+import { resolveVisibleNav } from '../config/navigation';
+
+export type SidebarNavigationProps = {
+  uiMode: UiMode;
+  permissions: Permissions;
+
+  // Controlled collapse (parent owns state)
+  isCollapsed?: boolean;
+  onToggle?: () => void;
+
+  // Optional UI state
+  loading?: boolean;
+};
+
+function isActivePath(currentPath: string, itemPath: string) {
+  // Exact match is safest for now; can expand later (startsWith) for nested routes.
+  return currentPath === itemPath;
+}
+
+const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
+  uiMode,
+  permissions,
+  isCollapsed = false,
+  onToggle,
+  loading = false,
+}) => {
+  // ThemeProvider is present in Admin layout, but may not exist in other shells yet (e.g., ProDashboardShell).
+  // Phase C: Sidebar must not crash if ThemeProvider isn't mounted.
+  const activeTheme = (() => {
+    try {
+      return useTheme();
+    } catch {
+      return { cssClass: '' } as { cssClass: string };
+    }
+  })();
+
+
+  const location = useLocation();
+
+  const groups = useMemo(() => {
+    try {
+      return resolveVisibleNav(uiMode, permissions);
+    } catch (err) {
+      console.error('[SidebarNavigation] resolveVisibleNav failed:', err);
+      return [];
+    }
+  }, [uiMode, permissions]);
+
+  const title =
+    uiMode === 'admin' ? 'AQUORIX Admin' : uiMode === 'affiliate' ? 'AQUORIX Partner' : 'AQUORIX Pro';
+
+  return (
+    <aside className={`sidebar ${activeTheme.cssClass} ${isCollapsed ? 'sidebar--collapsed' : ''}`}>
+      <div className="sidebar__header">
+        <img
+          src="/aqx-square-naut-white-96x96.svg"
+          alt="AQUORIX Logo"
+          className="sidebar-logo"
+        />
+        {!isCollapsed && <span className="sidebar-title">{title}</span>}
+      </div>
+
+      <nav>
+        {loading ? (
+          <div className="sidebar__loading" style={{ padding: 12, opacity: 0.8 }}>
+            {!isCollapsed ? 'Loading…' : '…'}
+          </div>
+        ) : (
+          <ul>
+            {groups.map((group) => {
+              // Group header only when expanded
+              return (
+                <React.Fragment key={`${uiMode}:${group.group}`}>
+                  {!isCollapsed && group.group ? (
+                    <li className="sidebar__group-label">{group.group}</li>
+                  ) : null}
+
+                  {group.items.map((item: NavItem & { isDisabled?: boolean; reason?: string }) => {
+                    const active = isActivePath(location.pathname, item.path);
+
+                    if (item.isDisabled) {
+                      return (
+                        <li key={item.path} className={`sidebar__item ${active ? 'active' : ''} disabled`}>
+                          <div
+                            className="sidebar__link disabled"
+                            title={item.reason || 'Unavailable'}
+                            aria-disabled="true"
+                          >
+                            <span className="icon" aria-hidden="true">
+                              {/* iconKey placeholder (Phase C). We keep it simple. */}
+                              <span className="icon-dot" />
+                            </span>
+                            {!isCollapsed && (
+                              <span className="label">
+                                {item.label}
+                                <span className="sidebar__badge" style={{ marginLeft: 8, opacity: 0.75 }}>
+                                  {item.reason || 'Unavailable'}
+                                </span>
+                              </span>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    }
+
+                    return (
+                      <li key={item.path} className={`sidebar__item ${active ? 'active' : ''}`}>
+                        <Link to={item.path} className="sidebar__link">
+                          <span className="icon" aria-hidden="true">
+                            {/* iconKey placeholder (Phase C). Map to Lucide later. */}
+                            <span className="icon-dot" />
+                          </span>
+                          {!isCollapsed && <span className="label">{item.label}</span>}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </React.Fragment>
+              );
+            })}
+          </ul>
+        )}
+      </nav>
+
+      {/* Collapse toggle (optional) */}
+      {onToggle ? (
+        <div className="sidebar__footer" style={{ padding: 10 }}>
+          <button
+            type="button"
+            className="sidebar__toggle"
+            onClick={onToggle}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? '›' : '‹'}
+          </button>
+        </div>
+      ) : null}
+    </aside>
+  );
+};
+
+export default SidebarNavigation;

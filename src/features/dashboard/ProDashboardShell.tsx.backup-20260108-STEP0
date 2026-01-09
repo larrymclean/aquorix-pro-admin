@@ -1,0 +1,105 @@
+/**
+ * ============================================================================
+ * AQUORIX Pro Dashboard Shell
+ * ============================================================================
+ * File: src/features/dashboard/ProDashboardShell.tsx
+ * Purpose:
+ *   - Provides the Pro Dashboard layout chrome (TopNav + Sidebar + Main pane)
+ *   - Acts as a route shell for nested dashboard pages via <Outlet />
+ * Version: 1.4.2
+ * Status: Phase C (Dynamic nav wiring)
+ *
+ * Notes:
+ *   - Phase C: Sidebar MUST be driven by /api/v1/me (ui_mode + permissions)
+ *   - tier_level is display-only (no gating)
+ *   - Single boot call invariant: fetch /me here once; children receive via props
+ *
+ * Change Log (append-only):
+ *   - 2026-01-08 - v1.4.2 (Larry McLean + AI Team)
+ *     - Replace legacy Pro sidebar with Phase C SidebarNavigation (ui_mode + permissions)
+ *     - Fetch /api/v1/me once in shell; pass me to TopNav override
+ *     - Preserve collapsed sidebar behavior
+ * ============================================================================
+ */
+
+import React, { useEffect, useState } from 'react';
+import { Outlet } from 'react-router-dom';
+
+import SidebarNavigation from '../../components/SidebarNavigation';
+import TopNav from '../../components/TopNav';
+
+import { getMe } from '../../utils/api';
+import type { MeResponse } from '../../components/TopNav';
+
+type ProDashboardShellProps = {
+  children?: React.ReactNode;
+};
+
+const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [meLoading, setMeLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMe() {
+      setMeLoading(true);
+      try {
+        const data = (await getMe()) as MeResponse;
+        if (mounted) setMe(data);
+      } catch (err) {
+        console.error('[ProDashboardShell] getMe failed:', err);
+        if (mounted) setMe(null);
+      } finally {
+        if (mounted) setMeLoading(false);
+      }
+    }
+
+    loadMe();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Phase C rule:
+  // - ui_mode + permissions drive sidebar visibility
+  // - if me is missing, default to 'pro' with empty permissions (shows minimum)
+  const uiMode = (me?.ui_mode as 'admin' | 'pro' | 'affiliate') || 'pro';
+  const permissions = (me as any)?.permissions || {};
+
+  return (
+    <div className="aqx-pro-dashboard-theme aqx-theme-dive-locker">
+      {/* TOP NAV – full width */}
+      <header className="aqx-topnav">
+        <TopNav meOverride={me} loadingOverride={meLoading} />
+      </header>
+
+      {/* LAYOUT ROW: sidebar + main */}
+      <div className="aqx-dashboard-root">
+        {/* SIDEBAR */}
+        <aside
+          className={`aqx-sidebar ${isCollapsed ? 'aqx-sidebar--collapsed' : ''}`}
+          style={{ backgroundColor: 'var(--sidebar-bg)' }}
+        >
+          <SidebarNavigation
+            uiMode={uiMode}
+            permissions={permissions}
+            isCollapsed={isCollapsed}
+            onToggle={() => setIsCollapsed((prev) => !prev)}
+            loading={meLoading}
+          />
+        </aside>
+
+        {/* MAIN COLUMN */}
+        <div className="aqx-right-pane">
+          <main className="aqx-main">{children ? children : <Outlet />}</main>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ProDashboardShell;

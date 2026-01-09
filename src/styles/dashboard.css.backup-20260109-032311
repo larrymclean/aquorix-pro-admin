@@ -48,23 +48,12 @@
       background-color: var(--aqx-background);
     }
 
-    /* Phase C.1: Ensure Dive Locker tokens exist in React runtime */
-    .aqx-theme-dive-locker {
-      --sidebar-bg: #17609b; /* MVP dive-locker-blue */
-      --sidebar-pill-hover: rgba(240, 249, 255, 0.18);
-      --sidebar-pill-active: rgba(240, 249, 255, 0.32);
-
-      --sidebar-expanded-width: 180px;
-      --sidebar-collapsed-width: 56px;
-    }
-
     .aqx-theme-dive-locker .aqx-sidebar {
-      width: var(--sidebar-expanded-width);
-      background-color: var(--sidebar-bg, #17609b) !important;
+      width: 180px;
+      background-color: var(--sidebar-bg);
       display: flex;
       flex-direction: column;
       border-right: 1px solid rgba(0, 0, 0, 0.05);
-      transition: width 0.18s ease;
     }
 
     .aqx-theme-dive-locker .aqx-right-pane {

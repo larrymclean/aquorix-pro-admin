@@ -5,20 +5,19 @@
 
   Author: Larry McLean + AI Team
   Created: 2025-07-07
-  Version: 2.0.2
+  Version: 2.0.1
 
-  Last Updated: 2026-01-08
-  Status: MVP+ (Phase C wiring)
+  Last Updated: 2026-01-06
+  Status: MVP+ (correct routing architecture)
 
   Dependencies:
   - react-router-dom Outlet
   - ThemeProvider + UserContext (tier-driven theme)
   - SidebarNavigation, TopNav
-  - getMe (single boot call)
 
   Notes:
-  - CRITICAL FIX: Layout MUST NOT render legacy AdminContent directly.
-  - Phase C: Layout fetches /api/v1/me once and passes ui_mode + permissions down.
+  - CRITICAL FIX: This layout MUST NOT render legacy AdminContent directly.
+  - Routed pages now render via <Outlet /> (e.g., /admin, /admin/system-health)
 
   Change Log:
     - 2026-01-06 - v2.0.0 (Author(s)): Larry McLean + AI Team
@@ -27,8 +26,8 @@
       - Preserve tier-based theme selection
     - 2026-01-07 - v2.0.1 (Author(s)): Larry McLean + AI Team
       - Add imports; implement getMe() fetch-once pattern for TopNav
-    - 2026-01-08 - v2.0.2 (Author(s)): Larry McLean + AI Team
-      - Phase C: pass uiMode + permissions into SidebarNavigation (dynamic nav)
+    - 2026-01-08 - v2.0.1 (Author(s)): Larry McLean + AI Team
+      - Modified SidebarNavigation core wiring
 */
 
 import React, { useEffect, useState } from 'react';
@@ -46,18 +45,16 @@ import '../styles/TopNav.css';
 
 import { getMe } from '../utils/api';
 import type { MeResponse } from '../components/TopNav';
-import type { UiMode, Permissions } from '../config/navigation';
 
 const AQXAdminLayout: React.FC = () => {
   const { tier } = useUser();
 
+  // Keep your existing defensive mapping (Tier 0 should not accidentally get affiliate themes)
   const themeName = getThemeByTier(tier).name;
   const themeKey = themeName === 'Bamboo Safari' ? 'bamboo' : 'marina';
 
   const [me, setMe] = useState<MeResponse | null>(null);
   const [meLoading, setMeLoading] = useState<boolean>(true);
-
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   useEffect(() => {
     let mounted = true;
@@ -82,22 +79,18 @@ const AQXAdminLayout: React.FC = () => {
     };
   }, []);
 
-  const uiMode = (me?.ui_mode ?? 'admin') as UiMode;
-  const permissions = (me?.permissions ?? {}) as Permissions;
-
   return (
     <ThemeProvider themeKey={themeKey}>
       <div className="aqx-admin-layout">
         <SidebarNavigation
-          uiMode={uiMode}
-          permissions={permissions}
-          isCollapsed={isCollapsed}
-          onToggle={() => setIsCollapsed((prev) => !prev)}
-          loading={meLoading}
+        uiMode={(me?.ui_mode as any) || 'admin'}
+        permissions={(me?.permissions as any) || {}}
+        loading={meLoading}
         />
 
         <div className="content-wrapper">
           <TopNav meOverride={me} loadingOverride={meLoading} />
+          {/* Routed admin pages render here */}
           <Outlet />
         </div>
       </div>

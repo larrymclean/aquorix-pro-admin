@@ -1,0 +1,125 @@
+/*
+  File: SidebarNavigation.css
+  Path: src/components/SidebarNavigation.css
+  Description: Styles for Phase C dynamic sidebar navigation (aqx-sidenav-*).
+               IMPORTANT: Avoids legacy .sidebar collisions.
+  Author: Larry McLean + AI Team
+  Created: 2026-01-08
+  Version: 1.0.0
+*/
+
+.aqx-sidenav {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 10px 12px 10px;
+  color: inherit;
+}
+
+.aqx-sidenav__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px 14px 8px;
+}
+
+.aqx-sidenav__logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+}
+
+.aqx-sidenav__title {
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.aqx-sidenav__nav {
+  flex: 1;
+  overflow: auto;
+}
+
+.aqx-sidenav__loading {
+  padding: 12px 8px;
+  opacity: 0.8;
+}
+
+.aqx-sidenav__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.aqx-sidenav__group {
+  margin: 12px 0 6px 0;
+  padding: 0 8px;
+  font-size: 12px;
+  opacity: 0.75;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.aqx-sidenav__item {
+  margin: 2px 0;
+}
+
+.aqx-sidenav__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.aqx-sidenav__item.is-active .aqx-sidenav__link {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.aqx-sidenav__icon {
+  width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aqx-sidenav__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.aqx-sidenav__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aqx-sidenav__badge {
+  margin-left: 8px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.aqx-sidenav__item.is-disabled .aqx-sidenav__link {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.aqx-sidenav__footer {
+  padding-top: 10px;
+}
+
+.aqx-sidenav__toggle {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  cursor: pointer;
+}
