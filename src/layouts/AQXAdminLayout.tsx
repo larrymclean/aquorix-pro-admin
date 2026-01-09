@@ -42,7 +42,6 @@ import { useUser } from '../components/UserContext';
 import { getThemeByTier } from '../theme.config';
 
 import '../styles/AQXAdmin.css';
-import '../styles/TopNav.css';
 
 import { getMe } from '../utils/api';
 import type { MeResponse } from '../components/TopNav';

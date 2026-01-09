@@ -30,6 +30,7 @@ import SchedulePage from './features/dashboard/pages/SchedulePage';
 
 import AuthCallback from './pages/AuthCallback';
 
+import './styles/AQXAdmin.css';
 
 function App() {
   return (

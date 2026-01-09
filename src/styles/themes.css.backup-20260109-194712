@@ -14,7 +14,7 @@
   Change Log:
     - 2026-01-09 - v1.0.0 (Larry McLean + AI Team)
       - Introduce theme-blue-steel (Admin), theme-dive-locker (Pro), theme-bamboo-safari (Affiliate)
-      - Centralize tokens to reduce global CSS collisions
+      - Centralize tokens to eliminate “fixed/left:240” layout collisions
 */
 
 /* ============================
