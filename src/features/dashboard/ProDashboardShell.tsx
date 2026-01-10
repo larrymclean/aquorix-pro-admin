@@ -1,40 +1,28 @@
 /*
   ============================================================================
-  AQUORIX Pro Dashboard Shell (Phase C Unified)
+  AQUORIX Pro Dashboard Shell (Phase C Unified + Canonical Theme)
   ============================================================================
   File:        ProDashboardShell.tsx
   Path:        src/features/dashboard/ProDashboardShell.tsx
-  Description: Pro Dashboard route shell. Provides shared TopNav + shared SidebarNavigation
-               and renders nested dashboard routes via <Outlet />.
+  Description: Dashboard route shell. Fetches /api/v1/me once via getMe(),
+               applies canonical theme via ThemeProvider, and renders chrome.
 
   Author:      Larry McLean + AI Team
-  Created:     2025-??-??
-  Version:     1.5.0
+  Version:     1.6.0
+  Last Updated: 2026-01-10
+  Status:      Phase C Locked
 
-  Last Updated: 2026-01-08
-  Status:      Phase C Active (unified shell wiring)
-
-  Dependencies:
-  - react-router-dom Outlet
-  - src/utils/api getMe()
-  - src/components/TopNav (canonical)
-  - src/components/SidebarNavigation (Phase C dynamic)
-  - /api/v1/me boot contract (ui_mode + permissions)
-
-  Notes:
-  - CRITICAL: Single boot call invariant.
-    ProDashboardShell fetches /api/v1/me exactly once via getMe().
-    TopNav and SidebarNavigation MUST NOT fetch /api/v1/me.
-  - CRITICAL: Do not import legacy dashboard components:
-    - src/features/dashboard/components/Sidebar.tsx
-    - src/features/dashboard/components/TopNav.tsx
+  Locked rules:
+  - Single boot call invariant: Shell fetches /api/v1/me exactly once.
+  - TopNav and SidebarNavigation MUST NOT fetch /api/v1/me.
+  - Theme class attachment point is ThemeProvider only (theme-*).
+  - Boot-gate chrome: do not render TopNav/Sidebar until me is loaded (no flicker).
 
   Change Log (append-only):
-    - 2026-01-08 - v1.5.0 (Larry McLean + AI Team)
-      - Unify Pro shell to use shared TopNav + Phase C SidebarNavigation
-      - Implement single boot call via getMe() in shell
-      - Pass uiMode + permissions into SidebarNavigation
-      - Preserve existing collapse behavior at shell level
+    - 2026-01-10 - v1.6.0 (Larry McLean + AI Team)
+      - Apply canonical theme based on me.ui_mode (admin/pro/affiliate)
+      - Remove legacy hardcoded theme class
+      - Boot-gate chrome to prevent theme flicker
 */
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -43,15 +31,14 @@ import { Outlet } from 'react-router-dom';
 import TopNav from '../../components/TopNav';
 import SidebarNavigation from '../../components/SidebarNavigation';
 
+import { ThemeProvider } from '../../components/ThemeProvider';
 import { getMe } from '../../utils/api';
 
-// Keep the type local to avoid coupling to UI components.
-// (If you later create src/types/me.ts, move this there.)
 type MeBoot = {
   ok: boolean;
   authenticated: boolean;
-  ui_mode: 'admin' | 'pro' | 'affiliate';
-  permissions: Record<string, boolean>;
+  ui_mode?: 'admin' | 'pro' | 'affiliate';
+  permissions?: Record<string, boolean>;
 };
 
 type ProDashboardShellProps = {
@@ -80,7 +67,8 @@ const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
       }
     }
 
-    boot();
+    void boot();
+
     return () => {
       mounted = false;
     };
@@ -89,36 +77,51 @@ const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
   const uiMode = useMemo(() => (me?.ui_mode ?? 'pro'), [me]);
   const permissions = useMemo(() => (me?.permissions ?? {}), [me]);
 
+  // Canonical theme mapping (LOCKED)
+  const themeKey = useMemo(() => {
+    if (uiMode === 'admin') return 'blue-steel';
+    if (uiMode === 'affiliate') return 'bamboo-safari';
+    return 'dive-locker';
+  }, [uiMode]);
+
+  // Boot-gate chrome (prevents flicker)
+  if (meLoading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div>Booting AQUORIX…</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="aqx-pro-dashboard-theme aqx-theme-dive-locker">
-      {/* TOP NAV – full width (canonical TopNav) */}
-      <header className="aqx-topnav">
-        {/* TopNav already supports overrides in your admin layout; we keep consistent */}
-        <TopNav meOverride={me as any} loadingOverride={meLoading} />
-      </header>
+    <ThemeProvider themeKey={themeKey as any}>
+      <div className="aqx-pro-dashboard-theme">
+        {/* TOP NAV – full width */}
+        <header className="aqx-topnav">
+          <TopNav meOverride={me as any} loadingOverride={meLoading} />
+        </header>
 
-      {/* LAYOUT ROW: sidebar + main */}
-      <div className="aqx-dashboard-root">
-        {/* SIDEBAR (shell owns sizing/background; component owns internal nav styling) */}
-        <aside
-          className={`aqx-sidebar ${isCollapsed ? 'aqx-sidebar--collapsed' : ''}`}
-          style={{ backgroundColor: 'var(--sidebar-bg)' }}
-        >
-          <SidebarNavigation
-            uiMode={uiMode}
-            permissions={permissions as any}
-            isCollapsed={isCollapsed}
-            onToggle={() => setIsCollapsed((prev) => !prev)}
-            loading={meLoading}
-          />
-        </aside>
+        {/* LAYOUT ROW: sidebar + main */}
+        <div className="aqx-dashboard-root">
+          <aside
+            className={`aqx-sidebar ${isCollapsed ? 'aqx-sidebar--collapsed' : ''}`}
+            style={{ backgroundColor: 'var(--sidebar-bg)' }}
+          >
+            <SidebarNavigation
+              uiMode={uiMode as any}
+              permissions={permissions as any}
+              isCollapsed={isCollapsed}
+              onToggle={() => setIsCollapsed((prev) => !prev)}
+              loading={meLoading}
+            />
+          </aside>
 
-        {/* MAIN COLUMN */}
-        <div className="aqx-right-pane">
-          <main className="aqx-main">{children ? children : <Outlet />}</main>
+          <div className="aqx-right-pane">
+            <main className="aqx-main">{children ? children : <Outlet />}</main>
+          </div>
         </div>
       </div>
-    </div>
+    </ThemeProvider>
   );
 };
 

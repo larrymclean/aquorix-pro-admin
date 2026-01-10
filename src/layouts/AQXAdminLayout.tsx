@@ -5,66 +5,46 @@
 
   Author: Larry McLean + AI Team
   Created: 2025-07-07
-  Version: 2.0.2
+  Version: 2.1.0
 
-  Last Updated: 2026-01-08
-  Status: MVP+ (Phase C wiring)
+  Last Updated: 2026-01-10
+  Status: MVP+ (Phase C locked)
 
   Dependencies:
   - react-router-dom Outlet
-  - ThemeProvider + UserContext (tier-driven theme)
+  - ThemeProvider (ui_mode-driven theme)
   - SidebarNavigation, TopNav
   - getMe (single boot call)
 
-  Notes:
-  - CRITICAL FIX: Layout MUST NOT render legacy AdminContent directly.
-  - Phase C: Layout fetches /api/v1/me once and passes ui_mode + permissions down.
+  Locked rules:
+  - Layout fetches /api/v1/me once (via getMe)
+  - Theme derived from me.ui_mode (NOT from UserContext tier)
+  - Boot-gate chrome (no flicker)
 
   Change Log:
-    - 2026-01-06 - v2.0.0 (Author(s)): Larry McLean + AI Team
-      - Replace legacy <AdminContent /> rendering with <Outlet />
-      - Stabilize imports (remove duplicates)
-      - Preserve tier-based theme selection
-    - 2026-01-07 - v2.0.1 (Author(s)): Larry McLean + AI Team
-      - Add imports; implement getMe() fetch-once pattern for TopNav
-    - 2026-01-08 - v2.0.2 (Author(s)): Larry McLean + AI Team
-      - Phase C: pass uiMode + permissions into SidebarNavigation (dynamic nav)
+    - 2026-01-10 - v2.1.0 (Larry McLean + AI Team)
+      - Theme selection moved to me.ui_mode (single authority)
+      - Remove tier-driven theme mapping (BootUserProvider is session-only now)
+      - Boot-gate chrome to prevent theme flicker
 */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 
 import SidebarNavigation from '../components/SidebarNavigation';
 import TopNav from '../components/TopNav';
 
 import { ThemeProvider } from '../components/ThemeProvider';
-import { useUser } from '../components/UserContext';
-import { getThemeByTier } from '../theme.config';
-
-import '../styles/AQXAdmin.css';
-
 import { getMe } from '../utils/api';
+
 import type { MeResponse } from '../components/TopNav';
 import type { UiMode, Permissions } from '../config/navigation';
 
+import '../styles/AQXAdmin.css';
+
 const AQXAdminLayout: React.FC = () => {
-  const { tier } = useUser();
-
-  //const themeName = getThemeByTier(tier).name;
-  //const themeKey = themeName === 'Bamboo Safari' ? 'bamboo' : 'marina';
-
-  // Phase D canonical theme mapping (tier-driven)
-  // Tier 0 = Admin (blue-steel)
-  // Tier 1–4 = Pro (dive-locker)
-  // Tier 5 = Affiliate (bamboo-safari)
-  const themeKey =
-    tier === 0 ? 'blue-steel' :
-    tier === 5 ? 'bamboo-safari' :
-    'dive-locker';
-
   const [me, setMe] = useState<MeResponse | null>(null);
   const [meLoading, setMeLoading] = useState<boolean>(true);
-
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   useEffect(() => {
@@ -83,18 +63,33 @@ const AQXAdminLayout: React.FC = () => {
       }
     }
 
-    loadMe();
+    void loadMe();
 
     return () => {
       mounted = false;
     };
   }, []);
 
-  const uiMode = (me?.ui_mode ?? 'admin') as UiMode;
-  const permissions = (me?.permissions ?? {}) as Permissions;
+  const uiMode = useMemo(() => (me?.ui_mode ?? 'admin') as UiMode, [me]);
+  const permissions = useMemo(() => (me?.permissions ?? {}) as Permissions, [me]);
+
+  const themeKey = useMemo(() => {
+    if (uiMode === 'admin') return 'blue-steel';
+    if (uiMode === 'affiliate') return 'bamboo-safari';
+    return 'dive-locker';
+  }, [uiMode]);
+
+  // Boot-gate chrome (prevents flicker)
+  if (meLoading) {
+    return (
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div>Booting AQUORIX…</div>
+      </div>
+    );
+  }
 
   return (
-    <ThemeProvider themeKey={themeKey}>
+    <ThemeProvider themeKey={themeKey as any}>
       <div className="aqx-admin-layout">
         <SidebarNavigation
           uiMode={uiMode}

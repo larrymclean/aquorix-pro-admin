@@ -1,505 +1,84 @@
 /*
- * ============================================================================
- * File:        RequireAuth.tsx
- * Version:     1.1.1
- * Path:        src/components/RequireAuth.tsx
- * Project:     AQUORIX Pro Dashboard
- * ============================================================================
- * Description:
- *   Route guard component for AQUORIX Pro Dashboard.
- *
- *   This implementation:
- *   - Validates authentication via Supabase session
- *   - Delegates ALL routing authority to backend /api/v1/me
- *   - Uses /api/v1/me as the single source of truth for:
- *       - Identity (supabase_user_id, email)
- *       - AQUORIX user presence (aquorix_user.user_id)
- *       - Tier (aquorix_user.tier)
- *       - Operator affiliation (operator.affiliation)
- *       - Onboarding routing (routing_hint)
- *   - Preserves optional gating:
- *       - allowedRoles = operator affiliation values (e.g. "owner" | "admin" | "staff")
- *       - allowedTiers = AQUORIX tier enum values (e.g. "solo", "dive_center", etc.)
- *
- * Architectural Rule:
- *   Frontend does NOT infer onboarding vs dashboard state.
- *   Backend (/api/v1/me) is the single source of truth.
- *
- * Author:      AQUORIX Engineering
- * Created:     2025-09-14
- *
- * Change Log (append-only):
- * --------------------------------------------------------------------------
- * v1.0.0  2025-09-14  AQUORIX Engineering
- *   - Initial RequireAuth implementation
- *   - Supabase session check + backend lookup (legacy)
- *
- * v1.1.0  2025-12-25  Larry McLean
- *   - Replace legacy lookup with /api/v1/me (routing authority)
- *   - Attach Bearer token to /me request (no querystring user_id)
- *   - Normalize role/tier from /me payload (enum-safe)
- *   - Fix redirect behavior: return <Navigate /> ONLY at component root
- *   - Use useNavigate for user-initiated actions (buttons)
- *   - Fetch /me once on mount (constraints do not trigger refetch)
- *   - Add clear backend-down state (do not mask as onboarding)
- *   - Professional logging output (no emoji)
- * 
- * v1.1.1 2026-01-06 - Larry McLean
- *   - Update role derivation section
- *   - Remove the admin redirect entirely
- * ============================================================================
- */
+  File: RequireAuth.tsx
+  Path: src/components/RequireAuth.tsx
+  Description: Route gate only. Checks Supabase session and allows/denies access.
+               MUST NOT call /api/v1/me (shell/layout owns /me).
+  Author: Larry McLean + AI Team
+  Version: 2.0.0
+  Last Updated: 2026-01-10
+  Status: Locked (Phase C)
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+  Locked rules:
+  - NO /api/v1/me calls here.
+  - No role/tier inference here.
+  - If session missing -> redirect to /login.
+
+  Change Log:
+    - 2026-01-10 - v2.0.0 (Larry McLean + AI Team)
+      - Simplify RequireAuth to gate-only
+      - Remove /api/v1/me dependency to eliminate double-boot flicker
+*/
+
+import React, { useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 
-interface RequireAuthProps {
-  children: React.ReactNode;
-  allowedRoles?: string[]; // NOTE: treated as operator affiliation (owner/admin/staff) for MVP
-  allowedTiers?: string[]; // NOTE: treated as aquorix_user.tier values
-}
+type RequireAuthProps = {
+  children: React.ReactElement;
+};
 
-interface AquorixAuthContext {
-  supabase_user_id: string | null;
-  email: string | null;
-
-  // AQUORIX DB user identity
-  user_id: string | null;
-  tier: string | null;
-
-  // Derived from operator affiliation (MVP semantics)
-  role: string | null;
-
-  // Future-proof: currently default true unless backend adds explicit flag
-  is_active: boolean;
-
-  routing_hint: 'admin' | 'dashboard' | 'onboarding' | 'login' | null;
-}
-
-type MeResponse =
-  | {
-      ok: true;
-      authenticated: true;
-      identity?: { supabase_user_id?: string; email?: string };
-      aquorix_user?: { user_id?: string; tier?: string };
-      operator?: { affiliation?: string | null };
-      internal_admin?: { admin_role?: string | null; admin_level?: number | null };
-      onboarding?: { is_complete?: boolean };
-      routing_hint?: string;
-    }
-  | {
-      ok: false;
-      error?: string;
-      message?: string;
-      routing_hint?: string;
-      identity?: { supabase_user_id?: string; email?: string };
-    };
-
-const ME_URL = 'http://localhost:3001/api/v1/me';
-
-type AuthErrorType =
-  | 'NO_SESSION'
-  | 'ME_UNAUTHORIZED'
-  | 'ME_BACKEND_DOWN'
-  | 'AQUORIX_USER_MISSING'
-  | 'INACTIVE'
-  | 'ROLE_DENIED'
-  | 'TIER_DENIED'
-  | null;
-
-interface AuthErrorState {
-  type: AuthErrorType;
-  message?: string;
-  details?: Record<string, unknown>;
-}
-
-const RequireAuth: React.FC<RequireAuthProps> = ({
-  children,
-  allowedRoles = [],
-  allowedTiers = [],
-}) => {
-  const navigate = useNavigate();
+const RequireAuth: React.FC<RequireAuthProps> = ({ children }) => {
   const location = useLocation();
 
-  const [ctx, setCtx] = useState<AquorixAuthContext | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState<AuthErrorState>({ type: null });
-
-  // For stable comparisons only (do NOT trigger /me refetch)
-  const allowedRolesKey = useMemo(() => allowedRoles.join('|'), [allowedRoles]);
-  const allowedTiersKey = useMemo(() => allowedTiers.join('|'), [allowedTiers]);
+  const [isAuthed, setIsAuthed] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
 
-    const checkAuthOnce = async () => {
+    async function checkSession() {
+      setLoading(true);
       try {
-        setLoading(true);
-        setAuthError({ type: null });
-
-        // 1) Check Supabase session (auth only)
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) {
-          console.error('[RequireAuth] Supabase session error:', sessionError);
-          if (!isMounted) return;
-          setCtx(null);
-          setAuthError({ type: 'NO_SESSION' });
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('[RequireAuth] Supabase session error:', error);
+          if (!mounted) return;
+          setIsAuthed(false);
           return;
         }
 
-        if (!session?.access_token || !session?.user?.id) {
-          console.log('[RequireAuth] No authenticated Supabase session');
-          if (!isMounted) return;
-          setCtx(null);
-          setAuthError({ type: 'NO_SESSION' });
-          return;
-        }
-
-        // 2) Call /api/v1/me for authoritative context
-        let res: Response;
-        try {
-          res = await fetch(ME_URL, {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            cache: 'no-store',
-            credentials: 'omit',
-          });
-        } catch (netErr) {
-          console.error('[RequireAuth] /me network failure:', netErr);
-          if (!isMounted) return;
-          setCtx(null);
-          setAuthError({
-            type: 'ME_BACKEND_DOWN',
-            message: 'Backend unreachable. Please try again.',
-          });
-          return;
-        }
-
-        const status = res.status;
-        let meData: MeResponse | null = null;
-
-        try {
-          meData = (await res.json()) as MeResponse;
-        } catch {
-          meData = null;
-        }
-
-        console.log('[RequireAuth] /me response summary:', {
-          http_status: status,
-          ok: (meData as any)?.ok,
-          routing_hint: (meData as any)?.routing_hint,
-        });
-
-        // 401 => treat as logged out (token invalid/expired)
-        if (status === 401) {
-          if (!isMounted) return;
-          setCtx(null);
-          setAuthError({
-            type: 'ME_UNAUTHORIZED',
-            message: 'Session expired. Please sign in again.',
-          });
-          return;
-        }
-
-        // Any non-OK /me besides 401 => show backend-down (do NOT mask as onboarding)
-        if (!res.ok || !meData) {
-          console.error('[RequireAuth] /me request failed:', {
-            http_status: status,
-            payload: meData,
-          });
-
-          if (!isMounted) return;
-          setCtx(null);
-          setAuthError({
-            type: 'ME_BACKEND_DOWN',
-            message: 'Unable to load user context from backend.',
-            details: { http_status: status },
-          });
-          return;
-        }
-
-        // 3) Normalize /me payload into stable ctx
-        const supabase_user_id =
-          (meData as any)?.identity?.supabase_user_id ?? session.user.id ?? null;
-
-        const email =
-          (meData as any)?.identity?.email ?? session.user.email ?? null;
-
-        const user_id =
-          (meData as any)?.aquorix_user?.user_id ?? null;
-
-        const tier =
-          (meData as any)?.aquorix_user?.tier ?? null;
-
-        const routing_hint_raw = (meData as any)?.routing_hint ?? null;
-
-        // Role semantics:
-        // - Tier 0 Internal Admin: role := internal_admin.admin_role (fallback "admin")
-        // - Tier 1–5: role := operator.affiliation
-        const adminRoleRaw =
-          (meData as any)?.internal_admin?.admin_role ?? null;
-
-        const affiliation =
-          (meData as any)?.operator?.affiliation ?? null;
-
-        let role: string | null = null;
-
-        // v1.1.1 - Admin detection must NOT depend on routing_hint.
-        // Admin if tier_level == 0 OR internal_admin exists OR ui_mode == 'admin'
-        const tierLevelFromMe =
-          (meData as any)?.aquorix_user?.tier_level ??
-          (meData as any)?.tier_level ??
-          null;
-
-        const uiMode = (meData as any)?.ui_mode ?? null;
-        const hasInternalAdmin = Boolean((meData as any)?.internal_admin);
-
-        const isAdmin =
-          Number(tierLevelFromMe) === 0 ||
-          hasInternalAdmin ||
-          String(uiMode).toLowerCase() === 'admin';
-
-        if (isAdmin) {
-          role = adminRoleRaw ? String(adminRoleRaw) : 'admin';
-        } else {
-          role = affiliation ? String(affiliation) : null;
-        }
-
-        const routing_hint =
-        routing_hint_raw === 'admin' ||
-        routing_hint_raw === 'dashboard' ||
-        routing_hint_raw === 'onboarding' ||
-        routing_hint_raw === 'login'
-          ? routing_hint_raw
-          : null;
-
-        const normalized: AquorixAuthContext = {
-          supabase_user_id,
-          email,
-          user_id,
-          tier,
-          role,
-          is_active: true,
-          routing_hint,
-        };
-
-        if (!isMounted) return;
-        setCtx(normalized);
-
-        // If backend says onboarding, that is authoritative.
-        // (We do not set an error here; render will redirect.)
-        if (routing_hint === 'onboarding') {
-          return;
-        }
-
-        // If AQUORIX user is missing, treat as onboarding-required
-        if (!user_id) {
-          setAuthError({
-            type: 'AQUORIX_USER_MISSING',
-            message: 'Account setup required.',
-          });
-          return;
-        }
-
-        // Inactive (future-proof; currently always true)
-        if (normalized.is_active === false) {
-          setAuthError({ type: 'INACTIVE' });
-          return;
-        }
-
-        // Role gating
-        if (allowedRoles.length > 0 && !allowedRoles.includes(role ?? '')) {
-          setAuthError({
-            type: 'ROLE_DENIED',
-            details: { required: allowedRoles, actual: role ?? null },
-          });
-          return;
-        }
-
-        // Tier gating
-        if (allowedTiers.length > 0 && !allowedTiers.includes(tier ?? '')) {
-          setAuthError({
-            type: 'TIER_DENIED',
-            details: { required: allowedTiers, actual: tier ?? null },
-          });
-          return;
-        }
-
-        // Authorized
-        setAuthError({ type: null });
+        const hasSession = Boolean(data.session?.access_token);
+        if (!mounted) return;
+        setIsAuthed(hasSession);
       } catch (err) {
-        console.error('[RequireAuth] Auth check failed:', err);
-        if (!isMounted) return;
-        setCtx(null);
-        setAuthError({
-          type: 'ME_BACKEND_DOWN',
-          message: 'Unexpected error while checking authorization.',
-        });
+        console.error('[RequireAuth] Session check failed:', err);
+        if (!mounted) return;
+        setIsAuthed(false);
       } finally {
-        if (!isMounted) return;
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
-    };
+    }
 
-    checkAuthOnce();
+    void checkSession();
 
     return () => {
-      isMounted = false;
+      mounted = false;
     };
-    // IMPORTANT: fetch /me once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // -----------------------------
-  // Render Gate
-  // -----------------------------
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <div>Authenticating...</div>
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div>Checking session…</div>
       </div>
     );
   }
 
-  // No session OR token invalid => login
-  if (!ctx || authError.type === 'NO_SESSION' || authError.type === 'ME_UNAUTHORIZED') {
-    return <Navigate to="/login" replace />;
+  if (!isAuthed) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // Backend routing authority: onboarding
-
-  if (ctx.routing_hint === 'onboarding') {
-    return <Navigate to="/onboarding" replace />;
-  }
-
-  // Backend unavailable => explicit error screen (no loops)
-  if (authError.type === 'ME_BACKEND_DOWN') {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
-        <h2>Service Unavailable</h2>
-        <p>{authError.message || 'Unable to load user context.'}</p>
-        <p style={{ color: '#111', marginTop: 12, fontSize: 14 }}>
-          If this persists, check that the API is running on port 3001 and that /api/v1/me is reachable.
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          style={{
-            padding: '0.5rem 1rem',
-            marginTop: '1rem',
-            backgroundColor: '#2574d9',
-            color: 'white',
-            border: 'none',
-            borderRadius: 4,
-            cursor: 'pointer',
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  // Missing AQUORIX user => show setup UI (no embedded Navigate)
-  if (authError.type === 'AQUORIX_USER_MISSING') {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
-        <h2>Account Setup Required</h2>
-        <p>Your account needs to be set up in our system.</p>
-        <p>Please complete onboarding.</p>
-        <button
-          onClick={() => navigate('/onboarding')}
-          style={{
-            padding: '0.5rem 1rem',
-            marginTop: '1rem',
-            backgroundColor: '#2574d9',
-            color: 'white',
-            border: 'none',
-            borderRadius: 4,
-            cursor: 'pointer',
-          }}
-        >
-          Complete Onboarding
-        </button>
-      </div>
-    );
-  }
-
-  // Inactive
-  if (authError.type === 'INACTIVE' || ctx.is_active === false) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
-        <h2>Account Inactive</h2>
-        <p>Your account has been deactivated. Please contact support.</p>
-      </div>
-    );
-  }
-
-  // Role denied
-  if (authError.type === 'ROLE_DENIED') {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
-        <h2>Not Authorized</h2>
-        <p>You are not authorized to access this page.</p>
-        <p>Required role: {allowedRoles.join(', ')}</p>
-        <p>Your role: {ctx.role || '(none)'}</p>
-        <button
-          onClick={() => navigate('/dashboard')}
-          style={{
-            padding: '0.5rem 1rem',
-            marginTop: '1rem',
-            backgroundColor: '#2574d9',
-            color: 'white',
-            border: 'none',
-            borderRadius: 4,
-            cursor: 'pointer',
-          }}
-        >
-          Return to Dashboard
-        </button>
-      </div>
-    );
-  }
-
-  // Tier denied
-  if (authError.type === 'TIER_DENIED') {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#dc2626' }}>
-        <h2>Not Authorized</h2>
-        <p>You are not authorized to access this page.</p>
-        <p>Required tier: {allowedTiers.join(', ')}</p>
-        <p>Your tier: {ctx.tier || '(none)'}</p>
-        <button
-          onClick={() => navigate('/dashboard')}
-          style={{
-            padding: '0.5rem 1rem',
-            marginTop: '1rem',
-            backgroundColor: '#2574d9',
-            color: 'white',
-            border: 'none',
-            borderRadius: 4,
-            cursor: 'pointer',
-          }}
-        >
-          Return to Dashboard
-        </button>
-      </div>
-    );
-  }
-
-  console.log('[RequireAuth] User authorized:', {
-    user_id: ctx.user_id,
-    role: ctx.role,
-    tier: ctx.tier,
-    constraints: { allowedRolesKey, allowedTiersKey },
-  });
-
-  return <>{children}</>;
+  return children;
 };
 
 export default RequireAuth;

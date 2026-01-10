@@ -1,24 +1,20 @@
 /*
   File: index.tsx
   Path: CascadeProjects/aquorix-pro-admin/src/index.tsx
-  Description: App boot + user context bootstrap (NO ROUTING)
+  Description: App boot + session bootstrap (NO /api/v1/me calls)
   Author: Larry McLean + AI Team
-  Version: 1.0.3
-  Last Updated: 2026-01-06
+  Version: 1.1.0
+  Last Updated: 2026-01-10
 
-  Critical rules:
-  - BootUserProvider MUST NOT navigate()
-  - BootUserProvider MUST infer admin via tier_level/internal_admin/ui_mode (NOT routing_hint)
+  Critical rules (LOCKED):
+  - BootUserProvider MUST NOT call /api/v1/me (session-only)
+  - Shell/Layout is the single /api/v1/me authority
+  - Theme is applied by ThemeProvider in shell/layout (theme-* classes)
 
-    Change Log:
-    - 2025-11-27 - v1.0.1 (Author(s)): larry mcLean + ai team
-      - Update
-      
-    - 2026-01-05 - v1.0.2(Author(s)): larry Mclean + ai team
-      - Render a simple “Booting…” screen while page loads
-    
-    - 2026-01-06 - v1.0.3 - larry Mclean + ai team
-      - Fix routing hint - Tier 0 comes back as routing_hint: "dashboard"
+  Change Log:
+    - 2026-01-10 - v1.1.0 (Larry McLean + AI Team)
+      - Remove /api/v1/me boot fetch from index boot layer
+      - Keep Supabase session bootstrap only (prevents double-boot + flicker)
 */
 
 import React, { useEffect, useState } from 'react';
@@ -34,26 +30,6 @@ import App from './App';
 import { supabase } from './lib/supabaseClient';
 import { UserProvider, type UserContextValue } from './components/UserContext';
 
-const ME_URL = 'http://localhost:3001/api/v1/me';
-
-type MeResponse =
-  | {
-      ok: true;
-      authenticated: true;
-      identity?: { supabase_user_id?: string; email?: string };
-      aquorix_user?: { user_id?: string; tier?: string; tier_level?: number };
-      operator?: { affiliation?: string | null } | null;
-      internal_admin?: { admin_role?: string | null; admin_level?: number | null } | null;
-      ui_mode?: string | null;
-      routing_hint?: string | null;
-    }
-  | {
-      ok: false;
-      error?: string;
-      message?: string;
-      routing_hint?: string;
-    };
-
 function BootUserProvider({ children }: { children: React.ReactNode }) {
   const [value, setValue] = useState<UserContextValue | null>(null);
 
@@ -62,7 +38,8 @@ function BootUserProvider({ children }: { children: React.ReactNode }) {
 
     const boot = async () => {
       try {
-        // Safe fallback context so hooks never crash
+        // SAFE FALLBACK: do not infer tier/role here (no /me calls).
+        // Shell/layout will fetch /api/v1/me and apply correct theme + permissions.
         const fallback: UserContextValue = { role: '', tier: 0 };
 
         const { data, error } = await supabase.auth.getSession();
@@ -75,63 +52,15 @@ function BootUserProvider({ children }: { children: React.ReactNode }) {
 
         const session = data.session;
         if (!session?.access_token) {
-          // Not logged in. Provide fallback context only.
+          // Not logged in: provide fallback context only.
           if (!isMounted) return;
           setValue(fallback);
           return;
         }
 
-        // Pull authoritative context from backend
-        const res = await fetch(ME_URL, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          cache: 'no-store',
-          credentials: 'omit',
-        });
-
-        if (!res.ok) {
-          console.error('[BootUserProvider] /me non-OK:', res.status);
-          if (!isMounted) return;
-          setValue({ ...fallback, user: session.user });
-          return;
-        }
-
-        const meData = (await res.json()) as MeResponse;
-
-        const tierLevelFromMe =
-          (meData as any)?.aquorix_user?.tier_level ??
-          (meData as any)?.tier_level ??
-          null;
-
-        const internalAdmin = (meData as any)?.internal_admin ?? null;
-        const uiMode = (meData as any)?.ui_mode ?? null;
-
-        const isAdmin =
-          Number(tierLevelFromMe) === 0 ||
-          Boolean(internalAdmin) ||
-          String(uiMode).toLowerCase() === 'admin';
-
-        // Role semantics:
-        // - Admin: internal_admin.admin_role (fallback "admin")
-        // - Others: operator.affiliation (fallback "")
-        const adminRoleRaw = (meData as any)?.internal_admin?.admin_role ?? null;
-        const affiliation = (meData as any)?.operator?.affiliation ?? null;
-
-        const role = isAdmin
-          ? (adminRoleRaw ? String(adminRoleRaw) : 'admin')
-          : (affiliation ? String(affiliation) : '');
-
-        // Tier: prefer tier_level if present; else infer admin vs non-admin
-        const tier =
-          typeof tierLevelFromMe === 'number'
-            ? tierLevelFromMe
-            : (isAdmin ? 0 : 1);
-
+        // Logged in: provide session user only (still no /me calls here).
         if (!isMounted) return;
-        setValue({ role, tier, user: session.user });
+        setValue({ ...fallback, user: session.user });
       } catch (err) {
         console.error('[BootUserProvider] Boot failed:', err);
         if (!isMounted) return;
