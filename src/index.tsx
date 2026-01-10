@@ -21,10 +21,12 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 
-import './styles/aqx-unified-style-guide.css';
+// LSM Debug (trouble maker): import './styles/aqx-unified-style-guide.css';
 import './styles/AuthOnboarding.css';
 import './styles/dashboard.css';
 import './styles/themes.css';
+
+// LSM Debug (trouble maker): import './styles/TopNav.css';
 
 import App from './App';
 import { supabase } from './lib/supabaseClient';
