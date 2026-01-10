@@ -28,6 +28,7 @@ import { BrowserRouter } from 'react-router-dom';
 import './styles/aqx-unified-style-guide.css';
 import './styles/AuthOnboarding.css';
 import './styles/dashboard.css';
+import './styles/themes.css';
 
 import App from './App';
 import { supabase } from './lib/supabaseClient';

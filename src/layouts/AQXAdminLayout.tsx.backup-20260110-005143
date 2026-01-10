@@ -50,17 +50,8 @@ import type { UiMode, Permissions } from '../config/navigation';
 const AQXAdminLayout: React.FC = () => {
   const { tier } = useUser();
 
-  //const themeName = getThemeByTier(tier).name;
-  //const themeKey = themeName === 'Bamboo Safari' ? 'bamboo' : 'marina';
-
-  // Phase D canonical theme mapping (tier-driven)
-  // Tier 0 = Admin (blue-steel)
-  // Tier 1–4 = Pro (dive-locker)
-  // Tier 5 = Affiliate (bamboo-safari)
-  const themeKey =
-    tier === 0 ? 'blue-steel' :
-    tier === 5 ? 'bamboo-safari' :
-    'dive-locker';
+  const themeName = getThemeByTier(tier).name;
+  const themeKey = themeName === 'Bamboo Safari' ? 'bamboo' : 'marina';
 
   const [me, setMe] = useState<MeResponse | null>(null);
   const [meLoading, setMeLoading] = useState<boolean>(true);
