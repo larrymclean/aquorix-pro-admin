@@ -80,7 +80,7 @@ body {
 .aqx-sidebar {
   flex: 0 0 var(--sidebar-expanded-width, 180px);
   width: var(--sidebar-expanded-width, 180px);
-  background-color: var(--sidebar-bg, #071521);
+  background-color: var(--sidebar-bg) !important;
   display: flex;
   flex-direction: column;
   border-right: 1px solid rgba(0,0,0,0.08);
@@ -100,6 +100,20 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+/* =============================
+   THEME CANVAS / MAIN BACKGROUND
+   ============================= */
+
+.aqx-main {
+  background: var(--aqx-background, var(--body-bg, #f5f6f5));
+  min-height: 100vh;
+}
+
+.aqx-main-inner {
+  background: transparent;
+}
+
 
 /* Main content area (must be readable; scroll lives here) */
 .aqx-main {
@@ -122,7 +136,7 @@ body {
 }
 
 /* Keep these bridges minimal (NO .aqx-main overrides!) */
-.theme-dive-locker .aqx-sidebar { background-color: var(--sidebar-bg, #071521) !important; }
+.theme-dive-locker .aqx-sidebar { background-color: var(--sidebar-bg) !important; }
 .theme-dive-locker .aqx-topnav { background-color: var(--topnav-bg); border-bottom-color: var(--topnav-border); }
 
 .theme-blue-steel .aqx-sidebar { background-color: var(--sidebar-bg) !important; }
@@ -272,6 +286,35 @@ body {
   gap: 2px;
 }
 
+/* =============================
+   ICON PILL + ICON COLORING
+   ============================= */
+
+.aqx-metric-icon-pill {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+
+  /* This drives lucide icon color via currentColor */
+  color: var(--aqx-primary, #17609b);
+}
+
+.aqx-metric-icon-pill svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Optional: icons inside cards if they appear “unstyled” */
+.aqx-card svg.lucide {
+  color: var(--aqx-primary, #17609b);
+}
+
 .aqx-brand-icon { width: 26px; height: 22px; display: block; }
 
 /* Collapse behavior */
@@ -329,6 +372,18 @@ body {
   justify-content: center;
 }
 .aqx-sidebar.aqx-sidebar--collapsed .aqx-sidebar-toggle svg { transform: rotate(180deg); }
+
+/* =============================
+   FALLBACK TEXT LOGO TILE
+   (When no uploaded image)
+   ============================= */
+
+.aqx-topnav div[title="No logo (text brand)"] {
+  background: rgba(0, 0, 0, 0.08) !important; /* readable on white topnav */
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  color: var(--aqx-primary, #17609b);
+  letter-spacing: 0.5px;
+}
 
 /* Topnav internal blocks */
 .aqx-topnav-operator-block { display: flex; flex-direction: column; gap: 2px; }

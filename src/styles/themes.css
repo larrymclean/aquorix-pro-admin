@@ -1,89 +1,95 @@
 /*
-  File: themes.css
-  Path: src/styles/themes.css
-  Description: Canonical theme tokens for AQUORIX dashboards (Admin / Pro / Affiliate).
-               ThemeProvider applies theme-* class to <html>.
-               Layout uses tokens via CSS variables.
+ * File: themes.css
+ * Path: src/styles/themes.css
+ * Description: AQUORIX Theme Definitions (Admin / Pro / Affiliate)
+ *
+ * Author: Larry McLean
+ * Created: 2026-01-12
+ * Version: 2.0.0
+ *
+ * Last Updated: 2026-01-12
+ * Status: PRODUCTION BETA - THEME TOKENS LOCKED
+ *
+ * Change Log:
+ *   - 2026-01-12 - v2.0.0 (Larry McLean):
+ *     - Removed dark translucent topnav tokens (rgba overlays)
+ *     - Standardized theme tokens for sidebar + topnav + cards + primary + background
+ *     - Restored clear visual separation between Admin / Pro / Affiliate
+ */
 
-  Author: Larry McLean + AI Team
-  Version: 1.1.0
-  Last Updated: 2026-01-10
-  Status: Active (Phase C Fix)
-
-  Change Log:
-    - 2026-01-10 - v1.1.0 (Larry McLean + AI Team)
-      - Add light content tokens: --aqx-body-bg, --aqx-body-text
-      - Clarify semantic split: chrome (dark) vs content (light)
-*/
-
-/* ============================
-   Admin Theme: Blue Steel
-============================ */
+/* Blue Steel Theme (Admin - Tier 0) */
 .theme-blue-steel {
-  /* Chrome (dark) */
-  --aqx-bg: #0b1220;
-  --sidebar-bg: #0b1220;
+  /* Blue Steel Colors */
+  --steel-blue: #2C4A5F;
+  --steel-blue-700: #1B3545;
+  --steel-blue-800: #0F2230;
+
+  /* Sidebar */
+  --sidebar-bg: #1B3545;
+  --sidebar-pill-hover: rgba(237, 243, 240, 0.15);
+  --sidebar-pill-active: rgba(237, 243, 240, 0.28);
+
+  /* TopNav */
+  --topnav-bg: #E0E5E9;
+  --topnav-border: #C5D0DA;
+
+  /* Cards */
+  --card-bg: #ffffff;
+  --card-shadow: 0 2px 10px rgba(44, 74, 95, 0.08);
+
+  /* Primary */
+  --aqx-primary: #2C4A5F;
+  --aqx-background: #F5F7FA;
+}
+
+/* Dive Locker Theme (Pro - Tier 1-4) */
+.theme-dive-locker {
+  /* Dive Locker Colors */
+  --dive-locker-blue: #17609b;
+  --aqx-aqua: #00d4ff;
+  --aqx-light-cobalt: #248dc1;
+
+  /* Sidebar */
+  --sidebar-bg: #17609b;
   --sidebar-pill-hover: rgba(240, 249, 255, 0.18);
   --sidebar-pill-active: rgba(240, 249, 255, 0.32);
 
-  --topnav-bg: rgba(11, 18, 32, 0.55);
-  --topnav-border: rgba(255, 255, 255, 0.10);
+  /* TopNav */
+  --topnav-bg: #ffffff;
+  --topnav-border: #e0e0e0;
 
-  --aqx-text: #ffffff;
-  --aqx-muted: rgba(255, 255, 255, 0.70);
+  /* Cards */
+  --card-bg: #ffffff;
+  --card-shadow: 0 2px 8px rgba(27, 77, 111, 0.06);
 
-  /* Content (light) */
-  --aqx-body-bg: #f8fafc;
-  --aqx-body-text: #1e293b;
-
-  /* Accent */
-  --aqx-accent: #248dc1;
+  /* Primary */
+  --aqx-primary: #17609b;
+  --aqx-primary-hover: #248dc1;
+  --aqx-primary-light: #00d4ff;
+  --aqx-background: #f5f6f5;
 }
 
-/* ============================
-   Pro Theme: Dive Locker
-============================ */
-.theme-dive-locker {
-  /* Chrome (dark) */
-  --aqx-bg: #071521;
-  --sidebar-bg: #071521;
-  --sidebar-pill-hover: rgba(240, 249, 255, 0.16);
-  --sidebar-pill-active: rgba(240, 249, 255, 0.28);
-
-  --topnav-bg: rgba(7, 21, 33, 0.55);
-  --topnav-border: rgba(255, 255, 255, 0.10);
-
-  --aqx-text: #ffffff;
-  --aqx-muted: rgba(255, 255, 255, 0.70);
-
-  /* Content (light) */
-  --aqx-body-bg: #ffffff;
-  --aqx-body-text: #0f172a;
-
-  /* Accent */
-  --aqx-accent: #00d4ff;
-}
-
-/* ============================
-   Affiliate Theme: Bamboo Safari
-============================ */
+/* Bamboo Safari Theme (Affiliate - Tier 5) */
 .theme-bamboo-safari {
-  /* Chrome (dark) */
-  --aqx-bg: #14110b;
-  --sidebar-bg: #14110b;
-  --sidebar-pill-hover: rgba(255, 248, 230, 0.14);
-  --sidebar-pill-active: rgba(255, 248, 230, 0.24);
+  /* Bamboo Colors */
+  --bamboo-leaf: #78947c;
+  --bamboo-beige: #f0ece4;
+  --bamboo-gold: #bfa56a;
 
-  --topnav-bg: rgba(20, 17, 11, 0.55);
-  --topnav-border: rgba(255, 255, 255, 0.10);
+  /* Sidebar */
+  --sidebar-bg: #78947c;
+  --sidebar-pill-hover: rgba(237, 243, 240, 0.15);
+  --sidebar-pill-active: rgba(237, 243, 240, 0.28);
 
-  --aqx-text: #ffffff;
-  --aqx-muted: rgba(255, 255, 255, 0.70);
+  /* TopNav */
+  --topnav-bg: #ffffff;
+  --topnav-border: #ece7de;
 
-  /* Content (light) */
-  --aqx-body-bg: #fafaf9;
-  --aqx-body-text: #1c1917;
+  /* Cards */
+  --card-bg: #ffffff;
+  --card-shadow: 0 2px 10px rgba(64, 62, 54, 0.06);
 
-  /* Accent */
-  --aqx-accent: #d6b36a;
+  /* Primary */
+  --aqx-primary: #78947c;
+  --aqx-background: #f4f2ed;
 }
