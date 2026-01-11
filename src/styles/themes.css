@@ -2,80 +2,88 @@
   File: themes.css
   Path: src/styles/themes.css
   Description: Canonical theme tokens for AQUORIX dashboards (Admin / Pro / Affiliate).
-               ThemeProvider applies a theme-* class; components consume CSS variables.
+               ThemeProvider applies theme-* class to <html>.
+               Layout uses tokens via CSS variables.
 
   Author: Larry McLean + AI Team
-  Created: 2026-01-09
-  Version: 1.0.0
-
-  Last Updated: 2026-01-09
-  Status: Active (Dashboard v1 Canonicalization Pass)
+  Version: 1.1.0
+  Last Updated: 2026-01-10
+  Status: Active (Phase C Fix)
 
   Change Log:
-    - 2026-01-09 - v1.0.0 (Larry McLean + AI Team)
-      - Introduce theme-blue-steel (Admin), theme-dive-locker (Pro), theme-bamboo-safari (Affiliate)
-      - Centralize tokens to reduce global CSS collisions
+    - 2026-01-10 - v1.1.0 (Larry McLean + AI Team)
+      - Add light content tokens: --aqx-body-bg, --aqx-body-text
+      - Clarify semantic split: chrome (dark) vs content (light)
 */
 
 /* ============================
    Admin Theme: Blue Steel
 ============================ */
 .theme-blue-steel {
+  /* Chrome (dark) */
   --aqx-bg: #0b1220;
-  --aqx-surface: rgba(255, 255, 255, 0.06);
-  --aqx-border: rgba(255, 255, 255, 0.10);
-
   --sidebar-bg: #0b1220;
   --sidebar-pill-hover: rgba(240, 249, 255, 0.18);
   --sidebar-pill-active: rgba(240, 249, 255, 0.32);
 
-  --topnav-bg: rgba(11, 18, 32, 0.75);
+  --topnav-bg: rgba(11, 18, 32, 0.55);
   --topnav-border: rgba(255, 255, 255, 0.10);
 
   --aqx-text: #ffffff;
   --aqx-muted: rgba(255, 255, 255, 0.70);
 
-  --aqx-accent: #248dc1; /* lt-cobalt-blue */
+  /* Content (light) */
+  --aqx-body-bg: #f8fafc;
+  --aqx-body-text: #1e293b;
+
+  /* Accent */
+  --aqx-accent: #248dc1;
 }
 
 /* ============================
    Pro Theme: Dive Locker
 ============================ */
 .theme-dive-locker {
+  /* Chrome (dark) */
   --aqx-bg: #071521;
-  --aqx-surface: rgba(255, 255, 255, 0.05);
-  --aqx-border: rgba(255, 255, 255, 0.10);
-
   --sidebar-bg: #071521;
   --sidebar-pill-hover: rgba(240, 249, 255, 0.16);
   --sidebar-pill-active: rgba(240, 249, 255, 0.28);
 
-  --topnav-bg: rgba(7, 21, 33, 0.70);
+  --topnav-bg: rgba(7, 21, 33, 0.55);
   --topnav-border: rgba(255, 255, 255, 0.10);
 
   --aqx-text: #ffffff;
   --aqx-muted: rgba(255, 255, 255, 0.70);
 
-  --aqx-accent: #00d4ff; /* neon cyan */
+  /* Content (light) */
+  --aqx-body-bg: #ffffff;
+  --aqx-body-text: #0f172a;
+
+  /* Accent */
+  --aqx-accent: #00d4ff;
 }
 
 /* ============================
    Affiliate Theme: Bamboo Safari
 ============================ */
 .theme-bamboo-safari {
+  /* Chrome (dark) */
   --aqx-bg: #14110b;
-  --aqx-surface: rgba(255, 255, 255, 0.06);
-  --aqx-border: rgba(255, 255, 255, 0.10);
-
   --sidebar-bg: #14110b;
   --sidebar-pill-hover: rgba(255, 248, 230, 0.14);
   --sidebar-pill-active: rgba(255, 248, 230, 0.24);
 
-  --topnav-bg: rgba(20, 17, 11, 0.75);
+  --topnav-bg: rgba(20, 17, 11, 0.55);
   --topnav-border: rgba(255, 255, 255, 0.10);
 
   --aqx-text: #ffffff;
   --aqx-muted: rgba(255, 255, 255, 0.70);
 
+  /* Content (light) */
+  --aqx-body-bg: #fafaf9;
+  --aqx-body-text: #1c1917;
+
+  /* Accent */
   --aqx-accent: #d6b36a;
 }

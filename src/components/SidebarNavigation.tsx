@@ -1,50 +1,30 @@
 /*
   File: SidebarNavigation.tsx
   Path: src/components/SidebarNavigation.tsx
-  Description: Phase C sidebar navigation driven by /api/v1/me (ui_mode + permissions).
-               Sidebar reflects permissions; it does not enforce authorization.
+  Description: Phase C sidebar navigation driven by uiMode + permissions.
+               IMPORTANT: Sidebar MUST NOT apply theme-* classes.
+               ThemeProvider is the ONLY theme attachment point.
 
   Author: Larry McLean + AI Team
   Created: 2025-07-07
-  Version: 2.2.3
-
-  Last Updated: 2026-01-09
+  Version: 2.2.4
+  Last Updated: 2026-01-10
   Status: Active (Phase C.1 parity pass)
 
-  Dependencies:
-  - react
-  - react-router-dom
-  - ThemeProvider (useTheme) [safe fallback]
-  - src/config/navigation (resolveVisibleNav)
-  - lucide-react (icons)
-
-  Notes:
-  - Single boot call invariant: Sidebar MUST NOT fetch /api/v1/me.
-  - tier_level is display-only; gating uses permissions only.
-  - Phase C.1: UI parity with HTML MVP prototype:
-      - No top branding header
-      - Flat list (no group headings)
-      - Lucide icons (no dot placeholders)
-      - Toggle lives in nav under Settings
-      - Sidebar background owned by shell (.aqx-sidebar), component stays transparent
+  Locked rules:
+  - Sidebar MUST NOT fetch /api/v1/me.
+  - Sidebar MUST NOT append theme-* classes.
+  - Shell owns sidebar container background (.aqx-sidebar uses --sidebar-bg).
 
   Change Log:
-    - 2026-01-08 - v2.2.2 (Larry McLean + AI Team)
-      - Remove hook-rule violations (useTheme called at top-level only)
-      - Rename CSS classes to aqx-sidenav-* to prevent Pro dashboard style collisions
-      - Render neutral root <div> so shells own the sidebar container element
-    - 2026-01-09 - v2.2.3 (Larry McLean + AI Team)
-      - Phase C.1 parity: remove top header branding (MVP has none)
-      - Render nav as flat list (no group headings)
-      - Replace dot placeholders with Lucide icons via iconKey mapping
-      - Move collapse toggle into nav list under Settings (MVP behavior)
+    - 2026-01-10 - v2.2.4 (Larry McLean + AI Team)
+      - Remove theme cssClass injection from component root (ThemeProvider only)
 */
 
 import React, { useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 import './SidebarNavigation.css';
-import { useTheme } from './ThemeProvider';
 
 import {
   Home,
@@ -105,9 +85,6 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
   onToggle,
   loading = false,
 }) => {
-  // Hook MUST be top-level (no callbacks / try-catch wrappers).
-  // ThemeProvider.useTheme() is now safe-fallback; no throw.
-  const theme = useTheme();
   const location = useLocation();
 
   const groups = useMemo(() => {
@@ -122,27 +99,8 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
   // Phase C.1: Render flat list (no group headings)
   const flatItems = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
-  const isSettingsNavItem = (item: ResolvedItem) => {
-    const label = (item.label || '').toLowerCase();
-    const path = (item.path || '').toLowerCase();
-    const key = (item.iconKey || '').toLowerCase();
-
-    return (
-      key === 'settings' ||
-      label === 'settings' ||
-      path.includes('/settings') ||
-      path.endsWith('settings')
-    );
-  };
-
   return (
-    <div
-      className={[
-        'aqx-sidenav',
-        theme?.cssClass ? theme.cssClass : '',
-        isCollapsed ? 'aqx-sidenav--collapsed' : '',
-      ].join(' ').trim()}
-    >
+    <div className={['aqx-sidenav', isCollapsed ? 'aqx-sidenav--collapsed' : ''].join(' ').trim()}>
       <nav className="aqx-sidenav__nav" aria-label="Sidebar navigation">
         {loading ? (
           <div className="aqx-sidenav__loading">{!isCollapsed ? 'Loading…' : '…'}</div>
@@ -187,10 +145,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
               return (
                 <li
                   key={item.path}
-                  className={[
-                    'aqx-sidenav__item',
-                    active ? 'is-active' : '',
-                  ].join(' ').trim()}
+                  className={['aqx-sidenav__item', active ? 'is-active' : ''].join(' ').trim()}
                 >
                   <Link to={item.path} className="aqx-sidenav__link">
                     <span className="aqx-sidenav__icon" aria-hidden="true">
@@ -224,7 +179,6 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
         )}
       </nav>
 
-      {/* Bottom brand footer stays (MVP has it) */}
       <div className="aqx-sidenav__brand-footer">
         <div className="aqx-sidenav__brand">
           <img

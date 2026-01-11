@@ -12,7 +12,8 @@
     - 2025-07-07, AQUORIX Engineering: Add hamburger and drawer styles for mobile nav.
 */
 
-.topnav {
+/* LSM Debug -- remove this? 01-10-26 chasing dashboard styles*/
+/*.topnav {
   height: 60px;
   border-bottom: 1px solid #e5e7eb;
   background: #ffffff;
@@ -20,6 +21,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: fixed;
+  left: 240px;
+  right: 0;
+  top: 0;
+  z-index: 999;
+}*/
+
+/* New 01-10-2026 chasing dashboard styles */
+.aqx-topnav {
+  height: 60px;
+  border-bottom: 1px solid var(--topnav-border, rgba(255, 255, 255, 0.10));
+  background: var(--topnav-bg, rgba(7, 21, 33, 0.70));
+  padding: 0 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
   position: fixed;
   left: 240px;
   right: 0;
