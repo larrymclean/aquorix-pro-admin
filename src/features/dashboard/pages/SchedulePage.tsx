@@ -41,6 +41,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
+import API_BASE_URL from "../../../utils/api";
 
 type Capacity = {
   capacity_mode: 'vessel_limited' | 'shore_unlimited';
@@ -90,7 +91,9 @@ type MeResponse = {
   };
 };
 
-const API_BASE = 'http://localhost:3001';
+// Production
+const API_BASE = API_BASE_URL;
+
 const ME_URL = `${API_BASE}/api/v1/me`;
 
 /**

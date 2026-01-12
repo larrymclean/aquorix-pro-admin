@@ -53,7 +53,9 @@ const AQXAdminLayout: React.FC = () => {
     async function loadMe() {
       setMeLoading(true);
       try {
-        const data = (await getMe()) as MeResponse;
+        const res = await getMe();
+        if (!res.ok) throw new Error(`getMe HTTP ${res.status}`);
+        const data = (await res.json()) as MeResponse;
         if (mounted) setMe(data);
       } catch (err) {
         console.error('[AQXAdminLayout] getMe failed:', err);

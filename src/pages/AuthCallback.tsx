@@ -23,6 +23,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import '../styles/Auth.css';
+import API_BASE_URL from "../utils/api";
 
 type Status = 'working' | 'done' | 'error';
 
@@ -32,7 +33,8 @@ type MeResponse = {
   onboarding?: { is_complete?: boolean };
 };
 
-const ME_URL = 'http://localhost:3001/api/v1/me';
+// Production
+const ME_URL = `${API_BASE_URL}/api/v1/me`;
 
 const AuthCallback: React.FC = () => {
   const navigate = useNavigate();

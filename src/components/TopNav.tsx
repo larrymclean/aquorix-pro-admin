@@ -4,10 +4,10 @@
  * ============================================================================
  * File:        src/components/TopNav.tsx
  * Purpose:     Top nav (brand + actions).
- * Version:     v1.0.2
+ * Version:     v1.0.3
  * Created:     2025-12-29
- * Updated:     2026-01-07
- * Author:      Larry McLean
+ * Updated:     2026-01-13
+ * Author:      Larry McLean + AI Team
  * Project:     AQUORIX™ API Project
  *
  * Description:
@@ -26,6 +26,9 @@
  *   - Fix header File path to match actual location (src/components/TopNav.tsx)
  *   - Add optional prop override to avoid duplicate /me fetch (Layout can pass me)
  *   - Keep safe fallback: fetch /me only if override not provided
+ * v1.0.3  - 2026-01-13 - Larry McLean + AI Team
+ *   - FIX: Remove getMe/getMeJson mismatch (TopNav now imports and uses getMe consistently)
+ *   - FIX: Ensure TopNav never fetches when meOverride is provided
  *
  * Notes:
  * - Do NOT alter existing changelog entries
@@ -53,7 +56,8 @@ export type MeResponse = {
     avatar_url?: string | null;
   };
 
-  permissions?: Record<string, boolean>; // <-- ADD THIS LINE 2026-01-08
+  // Canonical permissions bag (backend may include)
+  permissions?: Record<string, boolean>;
 
   operator?: {
     operator_id?: number | string | null;
@@ -101,7 +105,7 @@ const TopNav: React.FC<TopNavProps> = ({ meOverride, loadingOverride }) => {
   const loading = loadingOverride !== undefined ? loadingOverride : loadingLocal;
 
   useEffect(() => {
-    // If parent provides me, do not fetch here.
+    // If parent provides me (even null), do not fetch here.
     if (meOverride !== undefined) return;
 
     let mounted = true;
@@ -109,7 +113,9 @@ const TopNav: React.FC<TopNavProps> = ({ meOverride, loadingOverride }) => {
     async function loadMe() {
       setLoadingLocal(true);
       try {
-        const data = (await getMe()) as MeResponse;
+        const res = await getMe();
+        if (!res.ok) throw new Error(`getMe HTTP ${res.status}`);
+        const data = (await res.json()) as MeResponse;
 
         if (mounted) {
           setMeLocal(data);
@@ -124,7 +130,7 @@ const TopNav: React.FC<TopNavProps> = ({ meOverride, loadingOverride }) => {
       }
     }
 
-    loadMe();
+    void loadMe();
 
     return () => {
       mounted = false;

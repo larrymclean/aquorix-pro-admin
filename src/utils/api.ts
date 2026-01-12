@@ -1,71 +1,83 @@
 /*
-  File:         api.ts
-  Path:         src/utils/api.ts
+  File:        api.ts
+  Path:        src/utils/api.ts
+  Project:     AQUORIX Pro Dashboard
+  Version:     1.0.0
+  Last Updated: 2026-01-13
+
   Description:
+    Single source of truth for API base URL + helpers.
+    - Supports Render/production via REACT_APP_API_BASE_URL
+    - Keeps localhost fallback for local dev
+    - Provides:
+        apiUrl(path) -> string
+        getMe(token?) -> Response
+        getMeJson<T>(token?) -> parsed JSON
 
-  Author:       Larry mcLean & ChatGPT
-  Created:      2026-01-07
-  Version:      1.0.0
-
-  Last Updated: 2026-01-07
-  Status:       Active
-
-  Change Log:
-  - 2026-01-07 - v1.0.0 (Author(s)): Larry McLean
-    - Added header text data
-  - YYYY-MM-DD - vX.Y.Z (Author(s)):
-      - bullet
+  IMPORTANT:
+    - getMe() returns a Response (so callers can check res.ok / status)
+    - getMeJson() returns parsed JSON for callers that just want data
 */
 
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from "../lib/supabaseClient";
 
-const API_BASE =
-  process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+// Normalize base URL (strip trailing slashes)
+export const API_BASE_URL: string =
+  (process.env.REACT_APP_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:3001");
 
-/**
- * Get current Supabase access token
- */
-async function getAuthToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+// Legacy compatibility (some older code does: import API_BASE_URL from "../utils/api")
+export default API_BASE_URL;
+
+export function apiUrl(path: string): string {
+  if (!path) return API_BASE_URL;
+  return `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
 /**
- * Authenticated fetch helper for protected endpoints
+ * Fetch helper that injects Bearer token.
+ * If token not provided, it attempts to pull it from Supabase session.
  */
-export async function fetchWithAuth(
-  endpoint: string,
-  options: RequestInit = {}
+export async function apiFetch(
+  path: string,
+  init: RequestInit = {},
+  token?: string
 ): Promise<Response> {
-  const token = await getAuthToken();
+  let accessToken = token;
 
-  const headers = new Headers(options.headers);
-
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+  if (!accessToken) {
+    const { data } = await supabase.auth.getSession();
+    accessToken = data?.session?.access_token || undefined;
   }
 
-  if (!headers.has('Content-Type') && options.body) {
-    headers.set('Content-Type', 'application/json');
+  const headers: Record<string, string> = {
+    ...(init.headers as Record<string, string> | undefined),
+  };
+
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers
+  // Do not force Content-Type for GET requests with no body.
+  return fetch(apiUrl(path), {
+    ...init,
+    headers,
+    cache: "no-store",
+    credentials: "include",
   });
-
-  return response;
 }
 
 /**
- * Typed /api/v1/me call (boot authority)
+ * /api/v1/me - returns Response
  */
-export async function getMe() {
-  const res = await fetchWithAuth('/api/v1/me');
+export async function getMe(token?: string): Promise<Response> {
+  return apiFetch("/api/v1/me", { method: "GET" }, token);
+}
 
-  if (!res.ok) {
-    throw new Error(`getMe failed: ${res.status}`);
-  }
-
-  return res.json();
+/**
+ * /api/v1/me - returns parsed JSON
+ */
+export async function getMeJson<T = unknown>(token?: string): Promise<T> {
+  const res = await getMe(token);
+  if (!res.ok) throw new Error(`getMe HTTP ${res.status}`);
+  return (await res.json()) as T;
 }

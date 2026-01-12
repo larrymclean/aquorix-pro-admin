@@ -57,8 +57,11 @@ const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
     async function boot() {
       setMeLoading(true);
       try {
-        const data = (await getMe()) as MeBoot;
+        const res = await getMe();
+        if (!res.ok) throw new Error(`getMe HTTP ${res.status}`);
+        const data = (await res.json()) as MeBoot;
         if (mounted) setMe(data);
+
       } catch (err) {
         console.error('[ProDashboardShell] getMe failed:', err);
         if (mounted) setMe(null);
