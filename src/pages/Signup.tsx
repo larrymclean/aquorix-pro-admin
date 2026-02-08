@@ -3,7 +3,7 @@
  * Path: CascadeProjects/aquorix-pro-admin/src/pages/Signup.tsx
  * Description: AQUORIX signup page. Handles Supabase "Confirm email" flow gracefully.
  * Author: AQUORIX Engineering
- * Version: 1.2.2
+ * Version: 1.2.3
  * Created: 2025-07-07
  * Last Updated: 2026-01-02
  *
@@ -11,6 +11,9 @@
  * Dependencies: React, supabaseClient
  *
  * Change Log:
+ * 02-06-2026 - v1.2.3
+ * - Fix single line email redirect
+ * 
  * 01-02-2026 - v1.2.2
  * - Removed First Name / Last Name fields from /signup (identity captured in Onboarding Step 1).
  * - Removed "Command the Depths" text from left panel (logo only).
@@ -94,7 +97,7 @@ const Signup: React.FC = () => {
         password: formData.password,
         options: {
           // Make sure Supabase uses our app callback route after verification
-          emailRedirectTo: 'http://localhost:3500/',
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             // Identity is collected in Onboarding Step 1 (NOT here)
             role: 'pro_user'

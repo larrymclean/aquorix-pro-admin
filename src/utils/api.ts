@@ -2,7 +2,7 @@
   File:        api.ts
   Path:        src/utils/api.ts
   Project:     AQUORIX Pro Dashboard
-  Version:     1.0.0
+  Version:     1.0.1
   Last Updated: 2026-01-13
 
   Description:
@@ -17,13 +17,17 @@
   IMPORTANT:
     - getMe() returns a Response (so callers can check res.ok / status)
     - getMeJson() returns parsed JSON for callers that just want data
+
+  CHANGE LOG
+  2026-02-06 - v1.0.1
+  - Change Fallback
 */
 
 import { supabase } from "../lib/supabaseClient";
 
 // Normalize base URL (strip trailing slashes)
 export const API_BASE_URL: string =
-  (process.env.REACT_APP_API_BASE_URL?.replace(/\/+$/, "") || "http://localhost:3001");
+  (process.env.REACT_APP_API_BASE_URL?.replace(/\/+$/, "") || "https://aquorix-api.onrender.com");
 
 // Legacy compatibility (some older code does: import API_BASE_URL from "../utils/api")
 export default API_BASE_URL;

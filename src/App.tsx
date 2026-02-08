@@ -2,7 +2,7 @@
  File: App.tsx
  Path: src/App.tsx
  Description: Main entry for AQUORIX Pro/Admin Dashboard.
- Version: 1.5.0
+ Version: 1.5.1
  Last Updated: 2026-01-06
 
  Phase C Lock:
@@ -11,6 +11,9 @@
  - / -> /login
  - /signin -> /login
  - AuthCallback only on /auth/callback
+
+ Change Log:
+ - 2026-02-07 - v1.5.1 - DIR Fix: Add /admin/* routes
 */
 
 import React from 'react';
@@ -30,6 +33,8 @@ import SchedulePage from './features/dashboard/pages/SchedulePage';
 
 import AuthCallback from './pages/AuthCallback';
 
+import AQXAdminLayout from './layouts/AQXAdminLayout';
+import AdminOverview from './pages/admin/AdminOverview';
 
 function App() {
   return (
@@ -49,6 +54,20 @@ function App() {
 
         {/* Onboarding */}
         <Route path="/onboarding" element={<Onboarding />} />
+
+        {/* Admin (Tier 0) */}
+        <Route
+          path="/admin"
+          element={
+            <RequireAuth>
+              <AQXAdminLayout />
+            </RequireAuth>
+          }
+        >
+          {/* Default /admin -> /admin/overview */}
+          <Route index element={<Navigate to="/admin/overview" replace />} />
+          <Route path="overview" element={<AdminOverview />} />
+        </Route>
 
         {/* Dashboard (ALL authenticated users: admin + pro + affiliate) */}
         <Route
