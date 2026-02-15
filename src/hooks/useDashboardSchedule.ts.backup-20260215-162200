@@ -1,0 +1,57 @@
+/*
+  File: useDashboardSchedule.ts
+  Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/src/hooks/useDashboardSchedule.ts
+  Description:
+    Phase 5A/5B hook for dashboard schedule fetch + deterministic error handling.
+    Phase 5B addition:
+      - Exposes a refresh() function so UI can refetch after create/cancel without full page reload.
+
+  Author: AQUORIX Team
+  Created: 2026-02-14
+  Version: 1.1.0
+
+  Change Log:
+    - 2026-02-14 - v1.0.0:
+      - Initial creation
+    - 2026-02-16 - v1.1.0:
+      - Add refresh() to refetch schedule deterministically (no window reload)
+*/
+
+import { useCallback, useEffect, useState } from "react";
+import { getDashboardSchedule } from "../api/dashboardSchedule";
+import type { DashboardScheduleResponse } from "../types/dashboardSchedule";
+
+type State =
+  | { status: "loading" }
+  | { status: "error"; error: any }
+  | { status: "ready"; data: DashboardScheduleResponse };
+
+export function useDashboardSchedule(weekStart?: string) {
+  const [state, setState] = useState<State>({ status: "loading" });
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refresh = useCallback(() => {
+    setRefreshKey((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      setState({ status: "loading" });
+      try {
+        const data = await getDashboardSchedule(weekStart);
+        if (!cancelled) setState({ status: "ready", data });
+      } catch (error) {
+        if (!cancelled) setState({ status: "error", error });
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [weekStart, refreshKey]);
+
+  return { state, refresh };
+}

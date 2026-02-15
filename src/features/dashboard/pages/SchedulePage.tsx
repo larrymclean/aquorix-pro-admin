@@ -2,23 +2,33 @@
   File: SchedulePage.tsx
   Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/src/features/dashboard/pages/SchedulePage.tsx
   Description:
-    Phase 5A (Read-only): Render operator-scoped weekly schedule from backend API.
-    Deterministic handling for:
-      - 403: no operator affiliation
-      - 409: multiple affiliations (operator selection required - Phase 6)
+    Phase 5A: Render operator-scoped weekly schedule from backend API.
+    Phase 5B: Provide a stable, high-contrast Create Test Session button + deterministic refresh.
+
+    Key fixes:
+    - Button is always visible (no flash).
+    - Button is high-contrast and does NOT appear disabled due to faint styling.
+    - Soft-disable: we do NOT use the native "disabled" attribute (avoids browser dimming).
+    - We await refresh() so "Creating…" state is stable and the proof loop is deterministic.
 
   Author: AQUORIX Team
   Created: 2026-02-14
-  Version: 1.0.1
+  Version: 1.2.1
 
   Change Log:
     - 2026-02-14 - v1.0.0:
       - Phase 5A initial wiring: GET /api/v1/dashboard/schedule and render grouped list
     - 2026-02-15 - v1.0.1:
-      - Phase 5AB: Add "create" button related import
+      - Phase 5AB: Add create import (debug)
+    - 2026-02-16 - v1.2.0:
+      - Keep button visible during refresh (no flash)
+    - 2026-02-16 - v1.2.1:
+      - High-contrast button styling (no “dimmed” look)
+      - Soft-disable (no native disabled attribute)
+      - Await refresh() for a stable proof loop
 */
 
-import React from "react";
+import React, { useMemo, useState } from "react";
 import { useDashboardSchedule } from "../../../hooks/useDashboardSchedule";
 import type { DashboardScheduleSession } from "../../../types/dashboardSchedule";
 import { createDashboardSession } from "../../../api/dashboardSchedule";
@@ -31,12 +41,10 @@ function groupByDate(sessions: DashboardScheduleSession[]) {
     map[key].push(s);
   }
 
-  // sort sessions in each date group by start_time
   for (const k of Object.keys(map)) {
     map[k].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
   }
 
-  // return sorted keys
   const dates = Object.keys(map).sort((a, b) => a.localeCompare(b));
   return { dates, map };
 }
@@ -59,10 +67,7 @@ function ErrorBanner({ error }: { error: any }) {
     return (
       <div style={styles.bannerWarn}>
         <strong>409 — Multiple operator affiliations.</strong>
-        <div>
-          Operator selection required (Phase 6). Current affiliations:{" "}
-          {count ?? "unknown"}.
-        </div>
+        <div>Operator selection required (Phase 6). Current affiliations: {count ?? "unknown"}.</div>
         <div style={{ marginTop: 6, opacity: 0.85 }}>
           Fix for now: ensure exactly ONE active row in{" "}
           <code>aquorix.user_operator_affiliations</code>.
@@ -80,12 +85,19 @@ function ErrorBanner({ error }: { error: any }) {
 }
 
 export default function SchedulePage() {
-  // Phase 5A: no weekStart yet to avoid timezone churn; backend default is fine.
-  const state = useDashboardSchedule();
+  const { state, refresh } = useDashboardSchedule();
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Soft-disable: busy if we are creating or the hook is currently refreshing
+  const isBusy = isCreating || (state.status === "ready" && state.isRefreshing);
 
   async function handleTestCreate() {
-    //alert("CLICK: starting create"); // <-- add this - LSM debug 
+    if (isBusy) return;
+
+    setIsCreating(true);
     try {
+      // IMPORTANT: must be inside the currently displayed week to show up immediately.
+      // (Your screenshot week: 2026-02-09 → 2026-02-15, so 2026-02-14 is correct.)
       await createDashboardSession({
         itinerary_id: 1,
         team_id: 1,
@@ -96,103 +108,113 @@ export default function SchedulePage() {
         notes: "Phase 5B test session"
       });
 
-      //alert("CREATE OK: " + JSON.stringify(result)); // <-- add this - LSM debug
-
-      // simple refresh
-      window.location.reload();
+      // Deterministic proof loop: await refresh so UI state is stable.
+      await refresh();
     } catch (err: any) {
       alert(err?.message || "Create failed");
+    } finally {
+      setIsCreating(false);
     }
   }
 
-  if (state.status === "loading") {
-    return (
-      <div style={styles.page}>
-        <h1 style={styles.h1}>Schedule</h1>
+  // During first-load only, show loading card (button still visible above it).
+  const hasData = (state as any)?.data?.sessions;
+  const scheduleData = (state as any)?.data;
 
-        <div style={styles.card}>Loading schedule…</div>
-      </div>
-    );
-  }
-
-  if (state.status === "error") {
-    return (
-      <div style={styles.page}>
-       
-        <h1 style={styles.h1}>Schedule</h1>
-        <ErrorBanner error={state.error} />
-      </div>
-    );
-  }
-
-  const { data } = state;
-  const { dates, map } = groupByDate(data.sessions);
+  const grouped = useMemo(() => {
+    if (!scheduleData?.sessions) return null;
+    return groupByDate(scheduleData.sessions);
+  }, [scheduleData]);
 
   return (
     <div style={styles.page}>
       <h1 style={styles.h1}>Schedule</h1>
 
-      <button
-        onClick={handleTestCreate}
-        style={{
-          marginBottom: 12,
-          padding: "8px 14px",
-          borderRadius: 8,
-          cursor: "pointer"
-        }}
-      >
-        + Create Test Session
-      </button>
+      {/* Keep ops moving: show banner if error, but don’t nuke the page if we have data */}
+      {state.status === "error" ? <ErrorBanner error={(state as any).error} /> : null}
 
-      <div style={styles.meta}>
-        <div>
-          <strong>Operator:</strong> {data.operator_id}
-        </div>
-        <div>
-          <strong>Week:</strong> {data.week.start} → {data.week.end}
-        </div>
-        <div>
-          <strong>Sessions:</strong> {data.sessions.length}
-        </div>
+      {/* Toolbar: button must never look disabled unless truly busy */}
+      <div style={styles.toolbar}>
+        <button
+          onClick={handleTestCreate}
+          aria-disabled={isBusy ? "true" : "false"}
+          style={{
+            ...styles.primaryButton,
+            ...(isBusy ? styles.primaryButtonBusy : null)
+          }}
+        >
+          {isCreating ? "Creating…" : "+ Create Test Session"}
+        </button>
+
+        {state.status === "ready" && state.isRefreshing ? (
+          <div style={styles.statusText}>Refreshing…</div>
+        ) : null}
       </div>
 
-      {dates.length === 0 ? (
-        <div style={styles.card}>No sessions scheduled for this week.</div>
-      ) : (
-        dates.map((date) => (
-          <div key={date} style={styles.dayBlock}>
-            <div style={styles.dayHeader}>{date}</div>
+      {/* First load */}
+      {state.status === "loading" && !hasData ? (
+        <div style={styles.card}>Loading schedule…</div>
+      ) : null}
 
-            <div style={styles.dayList}>
-              {map[date].map((s) => (
-                <div key={s.session_id} style={styles.sessionRow}>
-                  <div style={styles.timeCol}>
-                    <div>
-                      <strong>{s.start_time}</strong>
-                    </div>
-                    <div style={styles.subtle}>Meet {s.meet_time}</div>
-                  </div>
+      {/* No data at all */}
+      {state.status === "error" && !hasData ? (
+        <div style={styles.card}>Unable to load schedule.</div>
+      ) : null}
 
-                  <div style={styles.mainCol}>
-                    <div style={styles.titleLine}>
-                      <strong>{s.site_name}</strong>{" "}
-                      <span style={styles.subtle}>({s.session_type})</span>
-                    </div>
-                    <div style={styles.subtle}>
-                      {s.itinerary_title} • {s.team_name}
-                    </div>
-                    {s.notes ? <div style={styles.notes}>{s.notes}</div> : null}
-                  </div>
-
-                  <div style={styles.idCol}>
-                    <div style={styles.subtle}>#{s.session_id}</div>
-                  </div>
-                </div>
-              ))}
+      {/* Normal render */}
+      {scheduleData?.sessions ? (
+        <>
+          <div style={styles.meta}>
+            <div>
+              <strong>Operator:</strong> {scheduleData.operator_id}
+            </div>
+            <div>
+              <strong>Week:</strong> {scheduleData.week.start} → {scheduleData.week.end}
+            </div>
+            <div>
+              <strong>Sessions:</strong> {scheduleData.sessions.length}
             </div>
           </div>
-        ))
-      )}
+
+          {!grouped || grouped.dates.length === 0 ? (
+            <div style={styles.card}>No sessions scheduled for this week.</div>
+          ) : (
+            grouped.dates.map((date) => (
+              <div key={date} style={styles.dayBlock}>
+                <div style={styles.dayHeader}>{date}</div>
+
+                <div style={styles.dayList}>
+                  {grouped.map[date].map((s) => (
+                    <div key={s.session_id} style={styles.sessionRow}>
+                      <div style={styles.timeCol}>
+                        <div>
+                          <strong>{s.start_time}</strong>
+                        </div>
+                        <div style={styles.subtle}>Meet {s.meet_time}</div>
+                      </div>
+
+                      <div style={styles.mainCol}>
+                        <div style={styles.titleLine}>
+                          <strong>{s.site_name}</strong>{" "}
+                          <span style={styles.subtle}>({s.session_type})</span>
+                        </div>
+                        <div style={styles.subtle}>
+                          {s.itinerary_title} • {s.team_name}
+                        </div>
+                        {s.notes ? <div style={styles.notes}>{s.notes}</div> : null}
+                      </div>
+
+                      <div style={styles.idCol}>
+                        <div style={styles.subtle}>#{s.session_id}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -207,6 +229,35 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 22,
     margin: "8px 0 12px",
   },
+  toolbar: {
+    display: "flex",
+    gap: 12,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  statusText: {
+    fontSize: 13,
+    opacity: 0.75,
+  },
+
+  // High-contrast primary button (no “disabled-looking” faint fill)
+  primaryButton: {
+    padding: "10px 14px",
+    borderRadius: 10,
+    cursor: "pointer",
+    border: "1px solid rgba(0,0,0,0.18)",
+    background: "#00D4FF",          // Neon Cyan brand
+    color: "#003846",               // Dark text for contrast
+    fontWeight: 800,
+    letterSpacing: 0.2,
+    boxShadow: "0 1px 0 rgba(0,0,0,0.18)",
+    userSelect: "none",
+  },
+  primaryButtonBusy: {
+    cursor: "not-allowed",
+    opacity: 0.65,
+  },
+
   meta: {
     display: "flex",
     flexWrap: "wrap",
@@ -267,11 +318,13 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     border: "1px solid rgba(255,200,0,0.45)",
     background: "rgba(255,200,0,0.12)",
+    marginBottom: 12
   },
   bannerError: {
     padding: 12,
     borderRadius: 10,
     border: "1px solid rgba(255,0,0,0.45)",
     background: "rgba(255,0,0,0.12)",
+    marginBottom: 12
   },
 };

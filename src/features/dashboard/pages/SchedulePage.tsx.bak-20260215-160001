@@ -1,0 +1,277 @@
+/*
+  File: SchedulePage.tsx
+  Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/src/features/dashboard/pages/SchedulePage.tsx
+  Description:
+    Phase 5A (Read-only): Render operator-scoped weekly schedule from backend API.
+    Deterministic handling for:
+      - 403: no operator affiliation
+      - 409: multiple affiliations (operator selection required - Phase 6)
+
+  Author: AQUORIX Team
+  Created: 2026-02-14
+  Version: 1.0.1
+
+  Change Log:
+    - 2026-02-14 - v1.0.0:
+      - Phase 5A initial wiring: GET /api/v1/dashboard/schedule and render grouped list
+    - 2026-02-15 - v1.0.1:
+      - Phase 5AB: Add "create" button related import
+*/
+
+import React from "react";
+import { useDashboardSchedule } from "../../../hooks/useDashboardSchedule";
+import type { DashboardScheduleSession } from "../../../types/dashboardSchedule";
+import { createDashboardSession } from "../../../api/dashboardSchedule";
+
+function groupByDate(sessions: DashboardScheduleSession[]) {
+  const map: Record<string, DashboardScheduleSession[]> = {};
+  for (const s of sessions) {
+    const key = s.session_date || "unknown-date";
+    if (!map[key]) map[key] = [];
+    map[key].push(s);
+  }
+
+  // sort sessions in each date group by start_time
+  for (const k of Object.keys(map)) {
+    map[k].sort((a, b) => (a.start_time || "").localeCompare(b.start_time || ""));
+  }
+
+  // return sorted keys
+  const dates = Object.keys(map).sort((a, b) => a.localeCompare(b));
+  return { dates, map };
+}
+
+function ErrorBanner({ error }: { error: any }) {
+  const status = error?.status;
+  const message = error?.message || "Unknown error";
+
+  if (status === 403) {
+    return (
+      <div style={styles.bannerWarn}>
+        <strong>403 — No operator affiliation.</strong>
+        <div>This user is not linked to any operator. (Data state problem)</div>
+      </div>
+    );
+  }
+
+  if (status === 409) {
+    const count = error?.raw?.affiliation_count;
+    return (
+      <div style={styles.bannerWarn}>
+        <strong>409 — Multiple operator affiliations.</strong>
+        <div>
+          Operator selection required (Phase 6). Current affiliations:{" "}
+          {count ?? "unknown"}.
+        </div>
+        <div style={{ marginTop: 6, opacity: 0.85 }}>
+          Fix for now: ensure exactly ONE active row in{" "}
+          <code>aquorix.user_operator_affiliations</code>.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.bannerError}>
+      <strong>Schedule load failed.</strong>
+      <div>{message}</div>
+    </div>
+  );
+}
+
+export default function SchedulePage() {
+  // Phase 5A: no weekStart yet to avoid timezone churn; backend default is fine.
+  const state = useDashboardSchedule();
+
+  async function handleTestCreate() {
+    //alert("CLICK: starting create"); // <-- add this - LSM debug 
+    try {
+      await createDashboardSession({
+        itinerary_id: 1,
+        team_id: 1,
+        dive_site_id: 67,
+        dive_datetime: "2026-02-14T10:00:00Z",
+        meet_time: "2026-02-14T09:30:00Z",
+        session_type: "shore",
+        notes: "Phase 5B test session"
+      });
+
+      //alert("CREATE OK: " + JSON.stringify(result)); // <-- add this - LSM debug
+
+      // simple refresh
+      window.location.reload();
+    } catch (err: any) {
+      alert(err?.message || "Create failed");
+    }
+  }
+
+  if (state.status === "loading") {
+    return (
+      <div style={styles.page}>
+        <h1 style={styles.h1}>Schedule</h1>
+
+        <div style={styles.card}>Loading schedule…</div>
+      </div>
+    );
+  }
+
+  if (state.status === "error") {
+    return (
+      <div style={styles.page}>
+       
+        <h1 style={styles.h1}>Schedule</h1>
+        <ErrorBanner error={state.error} />
+      </div>
+    );
+  }
+
+  const { data } = state;
+  const { dates, map } = groupByDate(data.sessions);
+
+  return (
+    <div style={styles.page}>
+      <h1 style={styles.h1}>Schedule</h1>
+
+      <button
+        onClick={handleTestCreate}
+        style={{
+          marginBottom: 12,
+          padding: "8px 14px",
+          borderRadius: 8,
+          cursor: "pointer"
+        }}
+      >
+        + Create Test Session
+      </button>
+
+      <div style={styles.meta}>
+        <div>
+          <strong>Operator:</strong> {data.operator_id}
+        </div>
+        <div>
+          <strong>Week:</strong> {data.week.start} → {data.week.end}
+        </div>
+        <div>
+          <strong>Sessions:</strong> {data.sessions.length}
+        </div>
+      </div>
+
+      {dates.length === 0 ? (
+        <div style={styles.card}>No sessions scheduled for this week.</div>
+      ) : (
+        dates.map((date) => (
+          <div key={date} style={styles.dayBlock}>
+            <div style={styles.dayHeader}>{date}</div>
+
+            <div style={styles.dayList}>
+              {map[date].map((s) => (
+                <div key={s.session_id} style={styles.sessionRow}>
+                  <div style={styles.timeCol}>
+                    <div>
+                      <strong>{s.start_time}</strong>
+                    </div>
+                    <div style={styles.subtle}>Meet {s.meet_time}</div>
+                  </div>
+
+                  <div style={styles.mainCol}>
+                    <div style={styles.titleLine}>
+                      <strong>{s.site_name}</strong>{" "}
+                      <span style={styles.subtle}>({s.session_type})</span>
+                    </div>
+                    <div style={styles.subtle}>
+                      {s.itinerary_title} • {s.team_name}
+                    </div>
+                    {s.notes ? <div style={styles.notes}>{s.notes}</div> : null}
+                  </div>
+
+                  <div style={styles.idCol}>
+                    <div style={styles.subtle}>#{s.session_id}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    padding: 16,
+    maxWidth: 1100,
+    margin: "0 auto",
+  },
+  h1: {
+    fontSize: 22,
+    margin: "8px 0 12px",
+  },
+  meta: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 12,
+    padding: 12,
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  card: {
+    padding: 14,
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 10,
+  },
+  dayBlock: {
+    marginBottom: 14,
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  dayHeader: {
+    padding: "10px 12px",
+    background: "rgba(255,255,255,0.06)",
+    fontWeight: 700,
+  },
+  dayList: {
+    padding: 10,
+    display: "grid",
+    gap: 10,
+  },
+  sessionRow: {
+    display: "grid",
+    gridTemplateColumns: "110px 1fr 70px",
+    gap: 12,
+    padding: 12,
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 10,
+  },
+  timeCol: {},
+  mainCol: {},
+  idCol: {
+    textAlign: "right",
+  },
+  subtle: {
+    opacity: 0.75,
+    fontSize: 13,
+  },
+  titleLine: {
+    marginBottom: 4,
+  },
+  notes: {
+    marginTop: 8,
+    fontSize: 13,
+    opacity: 0.9,
+  },
+  bannerWarn: {
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid rgba(255,200,0,0.45)",
+    background: "rgba(255,200,0,0.12)",
+  },
+  bannerError: {
+    padding: 12,
+    borderRadius: 10,
+    border: "1px solid rgba(255,0,0,0.45)",
+    background: "rgba(255,0,0,0.12)",
+  },
+};
