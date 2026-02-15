@@ -1,0 +1,96 @@
+/*
+  File: useDashboardSchedule.ts
+  Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/src/hooks/useDashboardSchedule.ts
+  Description:
+    Phase 5A/5B hook for schedule fetch with deterministic refresh behavior.
+
+    Key behaviors:
+    - Initial load uses a loading screen.
+    - Refresh preserves last good data (no UI flash).
+    - refresh() returns a Promise so callers can await a stable proof loop.
+
+  Author: AQUORIX Team
+  Created: 2026-02-14
+  Version: 1.1.1
+
+  Change Log:
+    - 2026-02-14 - v1.0.0:
+      - Initial creation (loading/error/ready)
+    - 2026-02-16 - v1.1.0:
+      - Preserve last good data during refresh (no UI flash)
+      - Add refresh() + isRefreshing flag
+    - 2026-02-16 - v1.1.1:
+      - refresh() returns Promise (awaitable)
+*/
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getDashboardSchedule } from "../api/dashboardSchedule";
+import type { DashboardScheduleResponse } from "../types/dashboardSchedule";
+
+type State =
+  | { status: "loading"; data?: undefined; error?: undefined; isRefreshing: false }
+  | { status: "error"; data?: DashboardScheduleResponse; error: any; isRefreshing: false }
+  | { status: "ready"; data: DashboardScheduleResponse; error?: undefined; isRefreshing: boolean };
+
+export function useDashboardSchedule(weekStart?: string) {
+  const [state, setState] = useState<State>({
+    status: "loading",
+    isRefreshing: false
+  });
+
+  // Keeps the last known good data so refresh doesn't "blank" the UI.
+  const lastGoodDataRef = useRef<DashboardScheduleResponse | null>(null);
+
+  const load = useCallback(
+    async (mode: "initial" | "refresh") => {
+      // Initial load: show loading screen
+      if (mode === "initial") {
+        setState({ status: "loading", isRefreshing: false });
+      }
+
+      // Refresh: keep the UI, just mark refreshing
+      if (mode === "refresh") {
+        const existing = lastGoodDataRef.current;
+        if (existing) {
+          setState({ status: "ready", data: existing, isRefreshing: true });
+        } else {
+          setState({ status: "loading", isRefreshing: false });
+        }
+      }
+
+      try {
+        const data = await getDashboardSchedule(weekStart);
+        lastGoodDataRef.current = data;
+        setState({ status: "ready", data, isRefreshing: false });
+      } catch (error) {
+        const existing = lastGoodDataRef.current;
+        if (existing) {
+          setState({ status: "error", data: existing, error, isRefreshing: false });
+        } else {
+          setState({ status: "error", error, isRefreshing: false });
+        }
+      }
+    },
+    [weekStart]
+  );
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      if (!alive) return;
+      await load("initial");
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [load]);
+
+  // IMPORTANT: return the promise so the UI can await a stable loop
+  const refresh = useCallback(() => {
+    return load("refresh");
+  }, [load]);
+
+  return { state, refresh };
+}
