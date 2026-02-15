@@ -2,29 +2,33 @@
   File: dashboardSchedule.ts
   Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/src/api/dashboardSchedule.ts
   Description:
-    Phase 5A API client for operator dashboard schedule.
+    Phase 5A + 5B API client for operator dashboard schedule.
     - Injects Supabase Bearer token
-    - Supports optional week_start (omits param if undefined)
-    - Normalizes backend { ok:false } responses into thrown errors
-    - Maps known backend statuses to deterministic numeric status codes for UI banners
+    - Supports read + create + cancel
+    - Deterministic error normalization (403/409)
 
   Author: AQUORIX Team
   Created: 2026-02-15
-  Version: 1.0.1
+  Version: 1.1.0
 
   Change Log:
-    - 2026-02-15 - v1.0.1:
-      - Omit week_start when undefined (prevents week_start=undefined)
-      - Attach raw response to error.raw and normalize status codes (403/409)
+    - 2026-02-16 - v1.1.0:
+      - Added createDashboardSession()
+      - Added cancelDashboardSession()
 */
 
 import { supabase } from "../lib/supabaseClient";
 
 const DASHBOARD_BASE = "http://localhost:3001/api/v1/dashboard";
 
+async function getAccessToken(): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) throw new Error("Not authenticated (no Supabase session token)");
+  return token;
+}
+
 function mapBackendStatusToHttp(status: any): number | undefined {
-  // Backend sometimes returns { status: "conflict" } with ok:false.
-  // Normalize for deterministic UI banners.
   if (status === 403 || status === 409) return status;
   if (status === "forbidden") return 403;
   if (status === "conflict") return 409;
@@ -32,51 +36,87 @@ function mapBackendStatusToHttp(status: any): number | undefined {
 }
 
 export async function getDashboardSchedule(weekStart?: string) {
-  const { data } = await supabase.auth.getSession();
-  const token = data?.session?.access_token;
-
-  if (!token) {
-    const err: any = new Error("Not authenticated (no Supabase session token)");
-    err.status = 401;
-    err.raw = null;
-    throw err;
-  }
+  const token = await getAccessToken();
 
   const url = new URL(`${DASHBOARD_BASE}/schedule`);
-  if (weekStart && typeof weekStart === "string" && weekStart.trim().length > 0) {
+  if (weekStart && weekStart.trim().length > 0) {
     url.searchParams.set("week_start", weekStart.trim());
   }
-  // else: omit week_start entirely so backend default logic works
 
   const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  let json: any = {};
-  try {
-    json = await res.json();
-  } catch {
-    json = {};
-  }
+  const json = await res.json().catch(() => ({}));
 
-  // Treat HTTP failure OR ok:false as an error
   if (!res.ok || json?.ok === false) {
-    const msg =
-      json?.message ||
-      json?.error ||
-      (res.ok ? "Backend returned ok:false" : res.statusText) ||
-      "Schedule fetch failed";
-
-    const err: any = new Error(msg);
-    err.raw = json;
-
-    // Prefer explicit HTTP code if present; otherwise map backend status string
+    const err: any = new Error(json?.message || "Schedule fetch failed");
     err.status =
       mapBackendStatusToHttp(json?.status) ??
-      (typeof res.status === "number" && res.status ? res.status : undefined) ??
+      res.status ??
       500;
-
+    err.raw = json;
     throw err;
+  }
+
+  return json;
+}
+
+/* ================================
+   PHASE 5B — CREATE SESSION
+================================ */
+
+export async function createDashboardSession(payload: {
+  itinerary_id: number;
+  team_id: number;
+  dive_site_id: number;
+  dive_datetime: string;
+  meet_time?: string;
+  notes?: string;
+  session_type?: string;
+  vessel_id?: number;
+}) {
+  const token = await getAccessToken();
+
+  const res = await fetch(`${DASHBOARD_BASE}/schedule/sessions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json?.ok === false) {
+    throw new Error(json?.message || "Create session failed");
+  }
+
+  return json;
+}
+
+/* ================================
+   PHASE 5B — CANCEL SESSION
+================================ */
+
+export async function cancelDashboardSession(session_id: number) {
+  const token = await getAccessToken();
+
+  const res = await fetch(
+    `${DASHBOARD_BASE}/schedule/sessions/${session_id}/cancel`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json?.ok === false) {
+    throw new Error(json?.message || "Cancel session failed");
   }
 
   return json;
