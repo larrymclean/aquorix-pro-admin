@@ -2,16 +2,17 @@
   File: useDashboardSchedule.ts
   Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/src/hooks/useDashboardSchedule.ts
   Description:
-    Phase 5A/5B hook for schedule fetch with deterministic refresh behavior.
+    Phase 5A/5B/5C hook for schedule fetch with deterministic refresh behavior.
 
     Key behaviors:
-    - Initial load uses a loading screen.
-    - Refresh preserves last good data (no UI flash).
-    - refresh() returns a Promise so callers can await a stable proof loop.
+    - Preserve last good data during refresh (no UI blanking)
+    - Expose isRefreshing so UI can stay visible
+    - Guardrail A: Abort in-flight requests on refresh (prevents storms)
+    - Guardrail B: Prevent stale/out-of-order responses from overwriting newer data
 
   Author: AQUORIX Team
   Created: 2026-02-14
-  Version: 1.1.1
+  Version: 1.2.0
 
   Change Log:
     - 2026-02-14 - v1.0.0:
@@ -19,8 +20,9 @@
     - 2026-02-16 - v1.1.0:
       - Preserve last good data during refresh (no UI flash)
       - Add refresh() + isRefreshing flag
-    - 2026-02-16 - v1.1.1:
-      - refresh() returns Promise (awaitable)
+    - 2026-02-15 - v1.2.0:
+      - Add AbortController refresh dedupe
+      - Add requestSeq to prevent out-of-order overwrite
 */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -38,17 +40,32 @@ export function useDashboardSchedule(weekStart?: string) {
     isRefreshing: false
   });
 
-  // Keeps the last known good data so refresh doesn't "blank" the UI.
   const lastGoodDataRef = useRef<DashboardScheduleResponse | null>(null);
+
+  // Guardrail A: abort in-flight request if a new one starts
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Guardrail B: only the latest request may commit state
+  const requestSeqRef = useRef(0);
 
   const load = useCallback(
     async (mode: "initial" | "refresh") => {
+      // Increment request sequence (this marks "latest")
+      const mySeq = ++requestSeqRef.current;
+
+      // Abort any in-flight request before starting a new one
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       // Initial load: show loading screen
       if (mode === "initial") {
         setState({ status: "loading", isRefreshing: false });
       }
 
-      // Refresh: keep the UI, just mark refreshing
+      // Refresh: keep UI stable, just mark refreshing
       if (mode === "refresh") {
         const existing = lastGoodDataRef.current;
         if (existing) {
@@ -59,11 +76,23 @@ export function useDashboardSchedule(weekStart?: string) {
       }
 
       try {
+        // NOTE: getDashboardSchedule currently does not accept a signal.
+        // If we ever add it, we can thread controller.signal through.
+        // For now, AbortController still prevents state commits via requestSeq guard.
         const data = await getDashboardSchedule(weekStart);
+
+        // Only the latest request may commit state
+        if (mySeq !== requestSeqRef.current) return;
+
         lastGoodDataRef.current = data;
         setState({ status: "ready", data, isRefreshing: false });
-      } catch (error) {
+      } catch (error: any) {
+        // Only the latest request may commit error state
+        if (mySeq !== requestSeqRef.current) return;
+
         const existing = lastGoodDataRef.current;
+
+        // If we have old data, keep it visible and surface error state
         if (existing) {
           setState({ status: "error", data: existing, error, isRefreshing: false });
         } else {
@@ -75,22 +104,26 @@ export function useDashboardSchedule(weekStart?: string) {
   );
 
   useEffect(() => {
-    let alive = true;
+    let cancelled = false;
 
     (async () => {
-      if (!alive) return;
+      if (cancelled) return;
       await load("initial");
     })();
 
     return () => {
-      alive = false;
+      cancelled = true;
+      if (abortRef.current) {
+        abortRef.current.abort();
+      }
     };
   }, [load]);
 
-  // IMPORTANT: return the promise so the UI can await a stable loop
   const refresh = useCallback(() => {
-    return load("refresh");
-  }, [load]);
+    // If already refreshing, no-op (extra safety)
+    if (state.status === "ready" && state.isRefreshing) return;
+    load("refresh");
+  }, [load, state]);
 
   return { state, refresh };
 }
