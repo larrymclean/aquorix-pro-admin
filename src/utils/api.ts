@@ -2,7 +2,7 @@
   File:        api.ts
   Path:        src/utils/api.ts
   Project:     AQUORIX Pro Dashboard
-  Version:     1.0.1
+  Version:     1.0.2
   Last Updated: 2026-01-13
 
   Description:
@@ -21,6 +21,8 @@
   CHANGE LOG
   2026-02-06 - v1.0.1
   - Change Fallback
+  2026-02-16 - v1.0.2
+  - Add API call helper for operator selection
 */
 
 import { supabase } from "../lib/supabaseClient";
@@ -84,4 +86,16 @@ export async function getMeJson<T = unknown>(token?: string): Promise<T> {
   const res = await getMe(token);
   if (!res.ok) throw new Error(`getMe HTTP ${res.status}`);
   return (await res.json()) as T;
+}
+
+/**
+ * POST /api/v1/operator/active
+ * Body: { operator_id }
+ * Sets users.active_operator_id (server-authoritative operator context).
+ */
+export async function setActiveOperator(operatorId: string, token?: string): Promise<Response> {
+  const body = { operator_id: Number(operatorId) };
+
+  // If apiFetch is your canonical helper, use it to keep consistency.
+  return apiFetch("/api/v1/operator/active", { method: "POST", body: JSON.stringify(body) }, token);
 }

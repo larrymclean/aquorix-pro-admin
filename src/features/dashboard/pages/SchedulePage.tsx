@@ -126,7 +126,6 @@ export default function SchedulePage() {
     }
   }
 
-
   async function handleCancel(session_id: number) {
     if (cancellingId !== null) return;
 
