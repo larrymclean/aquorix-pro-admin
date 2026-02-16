@@ -14,7 +14,7 @@
 
   Author: AQUORIX Team
   Created: 2026-02-14
-  Version: 1.3.0
+  Version: 1.3.1
 
   Change Log:
     - 2026-02-14 - v1.0.0:
@@ -24,6 +24,8 @@
     - 2026-02-15 - v1.3.0:
       - Phase 5C: Add cancel button per session row
       - Cancel calls cancelDashboardSession() then refresh()
+    - 2026-02-17 - v1.3.1:
+      - Phase 6: Replaced hard coded test dates with real date/time system variable code
 */
 
 import React, { useMemo, useState } from "react";
@@ -99,15 +101,21 @@ export default function SchedulePage() {
     setIsCreating(true);
 
     try {
+      const weekStart = scheduleData?.week?.start;
+
+      if (!weekStart) {
+        alert("Week not loaded yet.");
+        return;
+      }
+
       await createDashboardSession({
         itinerary_id: 1,
         team_id: 1,
         dive_site_id: 67,
-        // IMPORTANT: ensure this datetime is inside the currently displayed week
-        dive_datetime: "2026-02-14T10:00:00Z",
-        meet_time: "2026-02-14T09:30:00Z",
+        dive_datetime: `${weekStart}T10:00:00Z`,
+        meet_time: `${weekStart}T09:30:00Z`,
         session_type: "shore",
-        notes: "Phase 5B test session"
+        notes: `Test session ${new Date().toISOString()}`
       });
 
       refresh();
@@ -117,6 +125,7 @@ export default function SchedulePage() {
       setIsCreating(false);
     }
   }
+
 
   async function handleCancel(session_id: number) {
     if (cancellingId !== null) return;
