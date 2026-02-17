@@ -4,9 +4,9 @@
  * ============================================================================
  * File:        src/components/TopNav.tsx
  * Purpose:     Top nav (brand + actions).
- * Version:     v1.0.4
+ * Version:     v1.0.3
  * Created:     2025-12-29
- * Updated:     2026-02-17
+ * Updated:     2026-01-13
  * Author:      Larry McLean + AI Team
  * Project:     AQUORIX™ API Project
  *
@@ -15,12 +15,9 @@
  * - Displays brand identity (operator > affiliate > user display)
  * - Uses /api/v1/me as the single boot authority (canonical keys)
  *
- * Phase 6:
- * - Optional “Switch Operator” action (shown only when parent indicates multi-affiliation)
- * - Does NOT fetch /me when meOverride is provided (locked rule)
- *
  * Change Log:
  * -----------
+ * v1.?.?  - 12-29-25 - Locked branding logic...
  * v1.0.1  - 2026-01-07 - Larry McLean & ChatGPT
  *   - Refactor to canonical /api/v1/me keys (user.display_name, user.avatar_url, operator.name/logo_url)
  *   - Remove direct Supabase session fetch from TopNav (uses getMe via api helper)
@@ -32,8 +29,6 @@
  * v1.0.3  - 2026-01-13 - Larry McLean + AI Team
  *   - FIX: Remove getMe/getMeJson mismatch (TopNav now imports and uses getMe consistently)
  *   - FIX: Ensure TopNav never fetches when meOverride is provided
- * v1.0.4  - 2026-02-17 - Larry McLean + AI Team
- *   - Phase 6: Add optional “Switch Operator” button (parent-controlled)
  *
  * Notes:
  * - Do NOT alter existing changelog entries
@@ -42,16 +37,16 @@
  * ============================================================================
  */
 
-import React, { useEffect, useMemo, useState } from "react";
-import { Bell, HelpCircle, User as UserIcon } from "lucide-react";
-import { getMe } from "../utils/api";
+import React, { useEffect, useMemo, useState } from 'react';
+import { Bell, HelpCircle, User as UserIcon } from 'lucide-react';
+import { getMe } from '../utils/api';
 
 export type MeResponse = {
   api_version?: string;
   ok: boolean;
   authenticated: boolean;
-  routing_hint?: "login" | "onboarding" | "dashboard" | string;
-  ui_mode?: "admin" | "pro" | "affiliate" | string;
+  routing_hint?: 'login' | 'onboarding' | 'dashboard' | string;
+  ui_mode?: 'admin' | 'pro' | 'affiliate' | string;
 
   user?: {
     user_id?: number;
@@ -61,6 +56,7 @@ export type MeResponse = {
     avatar_url?: string | null;
   };
 
+  // Canonical permissions bag (backend may include)
   permissions?: Record<string, boolean>;
 
   operator?: {
@@ -87,37 +83,21 @@ type TopNavProps = {
    * Optional: If parent is fetching /me, pass loading state for skeleton UI.
    */
   loadingOverride?: boolean;
-
-  /**
-   * Phase 6: Parent can show "Switch Operator" if user has >1 affiliation.
-   */
-  showSwitchOperator?: boolean;
-
-  /**
-   * Phase 6: Called when user clicks "Switch Operator".
-   * Parent should open OperatorSelectorModal.
-   */
-  onSwitchOperator?: () => void;
 };
 
 function safeInitials(displayName?: string | null, email?: string | null) {
-  const name = (displayName || "").trim();
+  const name = (displayName || '').trim();
   if (name) {
     const parts = name.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
     return `${parts[0][0]}`.toUpperCase();
   }
-  const e = (email || "").trim();
+  const e = (email || '').trim();
   if (e) return e[0].toUpperCase();
-  return "A";
+  return 'A';
 }
 
-const TopNav: React.FC<TopNavProps> = ({
-  meOverride,
-  loadingOverride,
-  showSwitchOperator,
-  onSwitchOperator
-}) => {
+const TopNav: React.FC<TopNavProps> = ({ meOverride, loadingOverride }) => {
   const [meLocal, setMeLocal] = useState<MeResponse | null>(null);
   const [loadingLocal, setLoadingLocal] = useState<boolean>(true);
 
@@ -137,10 +117,14 @@ const TopNav: React.FC<TopNavProps> = ({
         if (!res.ok) throw new Error(`getMe HTTP ${res.status}`);
         const data = (await res.json()) as MeResponse;
 
-        if (mounted) setMeLocal(data);
+        if (mounted) {
+          setMeLocal(data);
+        }
       } catch (err) {
-        console.error("[TopNav] getMe failed:", err);
-        if (mounted) setMeLocal(null);
+        console.error('[TopNav] getMe failed:', err);
+        if (mounted) {
+          setMeLocal(null);
+        }
       } finally {
         if (mounted) setLoadingLocal(false);
       }
@@ -164,17 +148,30 @@ const TopNav: React.FC<TopNavProps> = ({
     const affiliateName = me?.affiliate?.name ?? null;
     const affiliateLogo = me?.affiliate?.logo_url ?? null;
 
+    // --- Locked branding precedence (canonical-only) ---
+    // 1) Operator (Tier 2–4)
+    // 2) Affiliate (Tier 5)
+    // 3) User display_name (Tier 0/1 fallback)
+    // 4) Email
     const displayName =
-      operatorName || affiliateName || userDisplay || userEmail || "AQUORIX Pro";
+      operatorName ||
+      affiliateName ||
+      userDisplay ||
+      userEmail ||
+      'AQUORIX Pro';
 
+    // Logo precedence:
+    // operator.logo_url > affiliate.logo_url > user.avatar_url > null
     const logoUrl = operatorLogo || affiliateLogo || userAvatar || null;
 
     const initials = safeInitials(userDisplay || displayName, userEmail);
 
-    return { displayName, logoUrl, initials };
+    return {
+      displayName,
+      logoUrl,
+      initials,
+    };
   }, [me]);
-
-  const canShowSwitch = Boolean(showSwitchOperator && onSwitchOperator);
 
   return (
     <>
@@ -186,7 +183,7 @@ const TopNav: React.FC<TopNavProps> = ({
                 width: 44,
                 height: 44,
                 borderRadius: 10,
-                background: "rgba(255,255,255,0.10)"
+                background: 'rgba(255,255,255,0.10)',
               }}
             />
           ) : brand.logoUrl ? (
@@ -197,11 +194,11 @@ const TopNav: React.FC<TopNavProps> = ({
                 width: 44,
                 height: 44,
                 borderRadius: 10,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 fontWeight: 700,
-                background: "rgba(255,255,255,0.10)"
+                background: 'rgba(255,255,255,0.10)',
               }}
               title="No logo (text brand)"
             >
@@ -211,25 +208,14 @@ const TopNav: React.FC<TopNavProps> = ({
         </div>
 
         <div className="aqx-topnav-operator-block">
-          <div className="aqx-topnav-label">{loading ? "Loading…" : "Brand"}</div>
+          <div className="aqx-topnav-label">{loading ? 'Loading…' : 'Brand'}</div>
           <div className="aqx-topnav-operator-name">
-            {loading ? "AQUORIX" : brand.displayName}
+            {loading ? 'AQUORIX' : brand.displayName}
           </div>
         </div>
       </div>
 
       <div className="aqx-topnav-actions">
-        {canShowSwitch ? (
-          <button
-            className="aqx-btn-primary"
-            type="button"
-            onClick={() => onSwitchOperator?.()}
-            title="Switch active operator"
-          >
-            <span>Switch Operator</span>
-          </button>
-        ) : null}
-
         <button className="aqx-btn-icon" aria-label="Notifications" type="button">
           <Bell />
         </button>

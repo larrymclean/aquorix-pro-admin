@@ -7,14 +7,13 @@
   Description: Dashboard route shell. Fetches /api/v1/me once via getMe(),
                applies canonical theme via ThemeProvider, and renders chrome.
 
-               Phase 6 additions:
-               - Gate: If user has multiple operator affiliations AND no active_operator_id,
+               Phase 6 addition:
+               - If user has multiple operator affiliations AND no active_operator_id,
                  show OperatorSelectorModal and require selection before proceeding.
-               - Manual: “Switch Operator” action in TopNav can open the same modal.
 
   Author:      Larry McLean + AI Team
-  Version:     1.6.3
-  Last Updated: 2026-02-17
+  Version:     1.6.2
+  Last Updated: 2026-02-16
   Status:      Phase C Locked --> Phase 6 Viking Build
 
   Locked rules:
@@ -34,8 +33,6 @@
       - Phase 6: FIX React structure (render modal inside return)
       - Phase 6: Add /me-driven gate (multi-affiliation + missing active_operator_id)
       - Phase 6: On select -> POST /api/v1/operator/active -> refetch /me -> setMe()
-    - 2026-02-17 - v1.6.3 (Larry McLean + AI Team)
-      - Phase 6: Add manual “Switch Operator” trigger from TopNav (same modal)
 */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -136,19 +133,9 @@ const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
     if (affiliationCount > 1 && (!activeOp || String(activeOp).trim() === "")) {
       setShowOperatorSelector(true);
     } else {
-      // NOTE: do not forcibly close here if user opened it manually;
-      // manual open/close is controlled by the handler below.
-      // We only auto-open when required by gate.
+      setShowOperatorSelector(false);
     }
   }, [meLoading, me]);
-
-  // ---------------------------------------------------------------------------
-  // Phase 6: Manual open (TopNav -> Switch Operator)
-  // ---------------------------------------------------------------------------
-  function openOperatorSelectorManually() {
-    setOperatorSelectError(null);
-    setShowOperatorSelector(true);
-  }
 
   // ---------------------------------------------------------------------------
   // Phase 6: Selection handler
@@ -162,7 +149,9 @@ const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
       const res = await setActiveOperator(operatorId);
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
-        throw new Error(`setActiveOperator HTTP ${res.status}${txt ? ` - ${txt}` : ""}`);
+        throw new Error(
+          `setActiveOperator HTTP ${res.status}${txt ? ` - ${txt}` : ""}`
+        );
       }
 
       // Refetch /me after user action (allowed; not a second "boot" fetch)
@@ -199,13 +188,12 @@ const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
     );
   }
 
-  const affiliations = (me?.operator_context?.affiliations || []) as OperatorAffiliation[];
-  const affiliationCount = Number(me?.operator_context?.affiliation_count || 0);
-  const showSwitchOperator = affiliationCount > 1;
+  const affiliations =
+    (me?.operator_context?.affiliations || []) as OperatorAffiliation[];
 
   return (
     <ThemeProvider themeKey={themeKey as any}>
-      {/* Phase 6: Operator selection modal */}
+      {/* Phase 6: Operator selection modal (rendered INSIDE return, correctly) */}
       <OperatorSelectorModal
         isOpen={showOperatorSelector}
         affiliations={affiliations}
@@ -218,12 +206,7 @@ const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
       <div className="aqx-pro-dashboard-theme">
         {/* TOP NAV – full width */}
         <header className="aqx-topnav">
-          <TopNav
-            meOverride={me as any}
-            loadingOverride={meLoading}
-            showSwitchOperator={showSwitchOperator}
-            onSwitchOperator={openOperatorSelectorManually}
-          />
+          <TopNav meOverride={me as any} loadingOverride={meLoading} />
         </header>
 
         {/* LAYOUT ROW: sidebar + main */}
@@ -242,14 +225,7 @@ const ProDashboardShell: React.FC<ProDashboardShellProps> = ({ children }) => {
           </aside>
 
           <div className="aqx-right-pane">
-            <main className="aqx-main">
-              {children ? (
-                children
-              ) : (
-                <Outlet key={`op-${me?.operator_context?.active_operator_id || "none"}`} />
-              )}
-            </main>
-
+            <main className="aqx-main">{children ? children : <Outlet />}</main>
           </div>
         </div>
       </div>

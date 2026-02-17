@@ -5,16 +5,22 @@
     Phase 5A: Render operator-scoped weekly schedule from backend API.
     Phase 5B: Create test session (mutation) + deterministic refresh.
     Phase 5C: Cancel session (mutation) + deterministic refresh.
+    Phase 6: Week navigation (prev/next 7 days) with backend-anchored floor clamp.
 
     Key behaviors:
     - UI does not blank during refresh
     - Create disables only while creating
     - Cancel disables only the selected session while cancelling
     - Errors are surfaced deterministically (403/409 banners remain)
+    - Week nav is backend-authoritative:
+        - Initial weekStart comes from backend week.start
+        - weekFloor locks to that initial backend week.start
+        - Prev clamps to weekFloor (never earlier)
+        - Next always advances +7 days
 
   Author: AQUORIX Team
   Created: 2026-02-14
-  Version: 1.3.1
+  Version: 1.3.3
 
   Change Log:
     - 2026-02-14 - v1.0.0:
@@ -26,9 +32,14 @@
       - Cancel calls cancelDashboardSession() then refresh()
     - 2026-02-17 - v1.3.1:
       - Phase 6: Replaced hard coded test dates with real date/time system variable code
+    - 2026-02-17 - v1.3.2:
+      - Phase 6: Modify weekStart date
+    - 2026-02-17 - v1.3.3:
+      - Phase 6: Add weekFloor anchored to backend week.start
+      - Phase 6: Prev clamps to weekFloor (not browser today) and disables at floor
 */
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDashboardSchedule } from "../../../hooks/useDashboardSchedule";
 import type { DashboardScheduleSession } from "../../../types/dashboardSchedule";
 import { createDashboardSession, cancelDashboardSession } from "../../../api/dashboardSchedule";
@@ -84,12 +95,31 @@ function ErrorBanner({ error }: { error: any }) {
 }
 
 export default function SchedulePage() {
-  const { state, refresh } = useDashboardSchedule();
+  // weekStart = the week_start param we send to backend (YYYY-MM-DD)
+  const [weekStart, setWeekStart] = useState<string | null>(null);
+
+  // weekFloor = backend-authoritative anchor for "earliest allowed weekStart"
+  const [weekFloor, setWeekFloor] = useState<string | null>(null);
+
+  // SINGLE hook call (do not duplicate)
+  const { state, refresh } = useDashboardSchedule(weekStart || undefined);
 
   const [isCreating, setIsCreating] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   const scheduleData = (state as any).data as any;
+
+  // ---------------------------------------------------------------------------
+  // Phase 6: Initialize weekStart + weekFloor once, from backend week.start
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const backendStart: string | undefined = scheduleData?.week?.start;
+    if (!backendStart) return;
+
+    // First time we ever see backendStart: lock floor + initialize weekStart
+    if (!weekStart) setWeekStart(backendStart);
+    if (!weekFloor) setWeekFloor(backendStart);
+  }, [scheduleData?.week?.start, weekStart, weekFloor]);
 
   const grouped = useMemo(() => {
     if (!scheduleData?.sessions) return { dates: [], map: {} as Record<string, DashboardScheduleSession[]> };
@@ -101,9 +131,9 @@ export default function SchedulePage() {
     setIsCreating(true);
 
     try {
-      const weekStart = scheduleData?.week?.start;
+      const wk = scheduleData?.week?.start;
 
-      if (!weekStart) {
+      if (!wk) {
         alert("Week not loaded yet.");
         return;
       }
@@ -112,8 +142,8 @@ export default function SchedulePage() {
         itinerary_id: 1,
         team_id: 1,
         dive_site_id: 67,
-        dive_datetime: `${weekStart}T10:00:00Z`,
-        meet_time: `${weekStart}T09:30:00Z`,
+        dive_datetime: `${wk}T10:00:00Z`,
+        meet_time: `${wk}T09:30:00Z`,
         session_type: "shore",
         notes: `Test session ${new Date().toISOString()}`
       });
@@ -166,6 +196,8 @@ export default function SchedulePage() {
 
   const { dates, map } = grouped;
 
+  const isAtFloor = Boolean(weekFloor && weekStart && weekStart <= weekFloor);
+
   return (
     <div style={styles.page}>
       <h1 style={styles.h1}>Schedule</h1>
@@ -188,6 +220,54 @@ export default function SchedulePage() {
         >
           {isCreating ? "Creating…" : "+ Create Test Session"}
         </button>
+
+        {weekStart && (
+          <>
+            <button
+              onClick={() => {
+                if (!weekStart) return;
+
+                const d = new Date(weekStart);
+                d.setDate(d.getDate() - 7);
+                const candidate = d.toISOString().split("T")[0];
+
+                if (weekFloor && candidate < weekFloor) {
+                  setWeekStart(weekFloor);
+                } else {
+                  setWeekStart(candidate);
+                }
+              }}
+              disabled={isAtFloor}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(0,0,0,0.15)",
+                cursor: isAtFloor ? "not-allowed" : "pointer",
+                opacity: isAtFloor ? 0.6 : 1
+              }}
+            >
+              ← Prev 7 Days
+            </button>
+
+            <button
+              onClick={() => {
+                if (!weekStart) return;
+
+                const d = new Date(weekStart);
+                d.setDate(d.getDate() + 7);
+                setWeekStart(d.toISOString().split("T")[0]);
+              }}
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(0,0,0,0.15)",
+                cursor: "pointer"
+              }}
+            >
+              Next 7 Days →
+            </button>
+          </>
+        )}
 
         {state.status === "ready" && state.isRefreshing ? (
           <div style={{ opacity: 0.75, fontSize: 13 }}>Refreshing…</div>
