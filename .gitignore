@@ -21,3 +21,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# AQUORIX local safety backups (do not commit)
+*.backup
+*.backup-*
+

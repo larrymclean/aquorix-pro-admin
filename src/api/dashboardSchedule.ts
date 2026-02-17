@@ -43,8 +43,9 @@ export async function getDashboardSchedule(weekStart?: string) {
     url.searchParams.set("week_start", weekStart.trim());
   }
 
-  const res = await fetch(url.toString(), {
+    const res = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
   });
 
   const json = await res.json().catch(() => ({}));
