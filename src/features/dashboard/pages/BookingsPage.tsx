@@ -94,6 +94,26 @@ type LoadState =
 
 type FilterKey = "all" | "needs_review" | "paid" | "unpaid" | "expired" | "cancelled";
 
+function getLocalYmd(d: Date) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getLocalIsoDow(d: Date) {
+  // JS: 0=Sun..6=Sat -> ISO: 1=Mon..7=Sun
+  const js = d.getDay();
+  return js === 0 ? 7 : js;
+}
+
+function getLocalWeekStartYmd(d: Date) {
+  const isoDow = getLocalIsoDow(d); // 1..7
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (isoDow - 1));
+  return getLocalYmd(monday);
+}
+
 function formatDate(yyyyMmDd: string) {
   // Safe: display as YYYY-MM-DD (keep deterministic; avoid locale surprises)
   return yyyyMmDd || "unknown-date";
@@ -190,7 +210,8 @@ export default function BookingsPage() {
       setState({ status: "loading" });
 
       try {
-        const res = await apiFetch("/api/v1/dashboard/bookings", { method: "GET" });
+        const weekStart = getLocalWeekStartYmd(new Date());
+        const res = await apiFetch(`/api/v1/dashboard/bookings?week_start=${encodeURIComponent(weekStart)}`, { method: "GET" });
         const json = (await res.json().catch(() => ({}))) as any;
 
         if (!res.ok || json?.ok === false) {
@@ -214,7 +235,7 @@ export default function BookingsPage() {
     if (state.status !== "ok") return [];
     const raw = state.data.bookings || [];
     const filtered = raw.filter((b) => matchesFilter(b, filter));
-    return sortBookings(filtered);
+    return filtered; // preserve backend order (pending-first cockpit truth)
   }, [state, filter]);
 
   const counts = useMemo(() => {
@@ -285,7 +306,10 @@ export default function BookingsPage() {
                 <BookingCard
                   key={b.booking_id}
                   b={b}
-                  onOpen={() => nav(`/dashboard/bookings/${b.booking_id}`, { state: { booking: b } })}
+                  onOpen={() => {
+                  const weekStart = getLocalWeekStartYmd(new Date());
+                  nav(`/dashboard/bookings/${b.booking_id}`, { state: { booking: b, weekStart } });
+                }}
                 />
               ))}
             </div>

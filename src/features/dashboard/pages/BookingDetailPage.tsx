@@ -86,6 +86,26 @@ type LoadState =
   | { status: "error"; message: string }
   | { status: "ok"; booking: ApiBooking; operatorId?: string };
 
+function getLocalYmd(d: Date) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getLocalIsoDow(d: Date) {
+  // JS: 0=Sun..6=Sat -> ISO: 1=Mon..7=Sun
+  const js = d.getDay();
+  return js === 0 ? 7 : js;
+}
+
+function getLocalWeekStartYmd(d: Date) {
+  const isoDow = getLocalIsoDow(d); // 1..7
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (isoDow - 1));
+  return getLocalYmd(monday);
+}
+
 function formatMoney(currency: string, amount: string) {
   const cur = currency || "—";
   const amt = amount || "—";
@@ -130,6 +150,7 @@ export default function BookingDetailPage() {
   const location = useLocation() as any;
 
   const navBooking = location?.state?.booking as ApiBooking | undefined;
+  const navWeekStart = location?.state?.weekStart as string | undefined;
 
   const [state, setState] = useState<LoadState>(() => {
     if (navBooking) return { status: "ok", booking: navBooking };
@@ -146,7 +167,8 @@ export default function BookingDetailPage() {
       setState({ status: "loading" });
 
       try {
-        const res = await apiFetch("/api/v1/dashboard/bookings", { method: "GET" });
+        const weekStart = navWeekStart || getLocalWeekStartYmd(new Date());
+        const res = await apiFetch(`/api/v1/dashboard/bookings?week_start=${encodeURIComponent(weekStart)}`, { method: "GET" });
         const json = (await res.json().catch(() => ({}))) as any;
 
         if (!res.ok || json?.ok === false) {
