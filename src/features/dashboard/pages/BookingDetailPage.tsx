@@ -97,6 +97,33 @@ function labelize(s?: string | null) {
   return String(s).replace(/_/g, " ");
 }
 
+function looksUtcIso(s?: string | null) {
+  if (!s) return false;
+  // Common UTC ISO patterns: ends with 'Z' or includes +HH:MM / -HH:MM
+  return /Z$/.test(s) || /[+-]\d{2}:\d{2}$/.test(s);
+}
+
+function formatIsoForDisplay(s?: string | null) {
+  if (!s) return "—";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return String(s); // fallback: show raw
+  // Deterministic, locale-safe display (no user locale surprises)
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+}
+
+function labelDiveDatetime(s?: string | null) {
+  if (!s) return "—";
+  // If it looks UTC-ish, label it explicitly to avoid “wrong time” confusion.
+  if (looksUtcIso(s)) return `${formatIsoForDisplay(s)} (UTC)`;
+  // Otherwise treat as “local as provided”
+  return `${formatIsoForDisplay(s)} (local)`;
+}
+
 export default function BookingDetailPage() {
   const nav = useNavigate();
   const { bookingId } = useParams();
@@ -256,7 +283,7 @@ export default function BookingDetailPage() {
             <Row k="Itinerary Title" v={booking.itinerary_title || "—"} />
             <Row k="Dive Date" v={booking.session_date || "—"} />
             <Row k="Start Time" v={booking.start_time || "—"} />
-            <Row k="Dive Datetime Local" v={booking.dive_datetime_local || "—"} mono />
+            <Row k="Dive Datetime" v={labelDiveDatetime(booking.dive_datetime_local)} mono />
             <Row k="Site" v={booking.site_name || "—"} />
           </div>
 

@@ -6,6 +6,13 @@
     - Calls GET /api/v1/dashboard/bookings via apiFetch (injects Bearer token)
     - Renders phone-first booking cards with deterministic badges + filter chips
     - No backend changes. No new endpoints.
+  
+  Queue Order Doctrine (NO-DRIFT):
+    - For now, UI applies a deterministic client-side sort:
+      session_date ASC → start_time ASC → created_at DESC
+    - This is a deliberate, documented “queue order law” for Phase 8.7.
+    - If backend order becomes authoritative later, we will remove client sorting only
+      after confirming the backend ordering contract in writing.
 
   Author: AQUORIX Team
   Created: 2026-02-27
