@@ -313,7 +313,7 @@ export default function BookingDetailPage() {
           <div style={styles.card}>
             <div style={styles.sectionTitle}>Actions</div>
             <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
-              Actions are intentionally disabled until we confirm the exact backend endpoints for approve/cancel/refund/resend-link.
+              Actions are intentionally disabled until we lock the UI workflow. Backend approve/reject endpoints exist, but we are not wiring mutations in Phase 8.7 P1.
             </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
