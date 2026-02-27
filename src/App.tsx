@@ -30,6 +30,8 @@ import { SystemHealthLogProvider } from './context/SystemHealthLogContext';
 import ProDashboardShell from './features/dashboard/ProDashboardShell';
 import ProDashboardMock from './features/dashboard/ProDashboardMock';
 import SchedulePage from './features/dashboard/pages/SchedulePage';
+import BookingsPage from './features/dashboard/pages/BookingsPage';
+import BookingDetailPage from './features/dashboard/pages/BookingDetailPage';
 
 import AuthCallback from './pages/AuthCallback';
 
@@ -80,6 +82,8 @@ function App() {
         >
           <Route index element={<ProDashboardMock />} />
           <Route path="schedule" element={<SchedulePage />} />
+          <Route path="bookings" element={<BookingsPage />} />
+          <Route path="bookings/:bookingId" element={<BookingDetailPage />} />
         </Route>
 
         {/* Not Authorized */}
