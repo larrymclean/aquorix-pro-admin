@@ -194,9 +194,42 @@ export default function BookingDetailPage() {
     return () => {
       isMounted = false;
     };
-  }, [bookingId, navBooking]);
+ }, [bookingId, navBooking, navWeekStart]);
 
   const booking = state.status === "ok" ? state.booking : null;
+    const [actionState, setActionState] = useState<{ status: "idle" | "working" | "ok" | "error"; message?: string }>({
+    status: "idle",
+  });
+
+    async function onReject() {
+    if (!booking) return;
+
+    const yes = window.confirm(`Reject (cancel) booking #${booking.booking_id}? This cannot be undone.`);
+    if (!yes) return;
+
+    setActionState({ status: "working" });
+
+    try {
+      const res = await apiFetch(`/api/v1/dashboard/bookings/${encodeURIComponent(String(booking.booking_id))}/reject`, {
+        method: "POST",
+      });
+
+      const json = (await res.json().catch(() => ({}))) as any;
+
+      if (!res.ok || json?.ok === false) {
+        const msg = json?.message || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      setActionState({ status: "ok", message: "Booking rejected (cancelled)." });
+
+      // Refresh list snapshot in-place (no drift): re-run the existing fallback loader by forcing reload.
+      // Simplest deterministic approach: just hard reload current page.
+      window.location.reload();
+    } catch (err: any) {
+      setActionState({ status: "error", message: err?.message || "Reject failed" });
+    }
+  }
 
   const sections = useMemo(() => {
     if (!booking) return null;
@@ -312,13 +345,46 @@ export default function BookingDetailPage() {
           {/* Actions (disabled for now) */}
           <div style={styles.card}>
             <div style={styles.sectionTitle}>Actions</div>
+                        {actionState.status === "error" ? (
+              <div style={{ ...styles.bannerError, marginBottom: 10 }}>
+                <strong>Action failed.</strong>
+                <div style={{ marginTop: 6 }}>{actionState.message}</div>
+              </div>
+            ) : null}
+
+            {actionState.status === "ok" ? (
+              <div
+                style={{
+                  border: "1px solid rgba(16,185,129,0.35)",
+                  background: "rgba(16,185,129,0.10)",
+                  borderRadius: 12,
+                  padding: 12,
+                  marginBottom: 10,
+                }}
+              >
+                <strong>Success.</strong>
+                <div style={{ marginTop: 6 }}>{actionState.message}</div>
+              </div>
+            ) : null}
             <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
               Actions are intentionally disabled until we lock the UI workflow. Backend approve/reject endpoints exist, but we are not wiring mutations in Phase 8.7 P1.
             </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               <button disabled style={styles.actionBtnDisabled}>Approve Booking</button>
-              <button disabled style={styles.actionBtnDisabled}>Cancel Booking</button>
+
+              <button
+                onClick={onReject}
+                disabled={actionState.status === "working"}
+                style={{
+                  ...styles.actionBtnDisabled,
+                  cursor: actionState.status === "working" ? "not-allowed" : "pointer",
+                  opacity: actionState.status === "working" ? 0.65 : 1,
+                }}
+              >
+                Reject Booking
+              </button>
+
               <button disabled style={styles.actionBtnDisabled}>Resend Payment Link</button>
               <button disabled style={styles.actionBtnDisabled}>Mark Manual Review Resolved</button>
             </div>
