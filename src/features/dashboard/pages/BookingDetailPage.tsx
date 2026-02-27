@@ -11,13 +11,17 @@
 
   Author: AQUORIX Team
   Created: 2026-02-27
-  Version: 0.2.0
+  Version: 0.3.0
 
   Change Log (append-only):
     - 2026-02-27 - v0.1.0:
       - Initial detail page scaffold + fallback loader
     - 2026-02-27 - v0.2.0:
       - Phone-first sections + deterministic display helpers
+    - 2026-02-27 - v0.3.0:
+      - Wire Actions: Approve + Reject buttons call backend endpoints via apiFetch (POST approve/reject)
+      - Add actionState to prevent double-submit and show deterministic error banner on failure
+      - Post-approve behavior: reset action state and navigate back to /dashboard/bookings for clean re-entry (no hard reload)
 */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -197,23 +201,16 @@ export default function BookingDetailPage() {
  }, [bookingId, navBooking, navWeekStart]);
 
   const booking = state.status === "ok" ? state.booking : null;
-    const [actionState, setActionState] = useState<{ status: "idle" | "working" | "ok" | "error"; message?: string }>({
-    status: "idle",
-  });
 
-    async function onReject() {
-    if (!booking) return;
-
-    const yes = window.confirm(`Reject (cancel) booking #${booking.booking_id}? This cannot be undone.`);
-    if (!yes) return;
+    async function handleApprove() {
+    if (!bookingId) return;
 
     setActionState({ status: "working" });
 
     try {
-      const res = await apiFetch(`/api/v1/dashboard/bookings/${encodeURIComponent(String(booking.booking_id))}/reject`, {
+      const res = await apiFetch(`/api/v1/dashboard/bookings/${encodeURIComponent(String(bookingId))}/approve`, {
         method: "POST",
       });
-
       const json = (await res.json().catch(() => ({}))) as any;
 
       if (!res.ok || json?.ok === false) {
@@ -221,15 +218,42 @@ export default function BookingDetailPage() {
         throw new Error(msg);
       }
 
-      setActionState({ status: "ok", message: "Booking rejected (cancelled)." });
+      // After approve, refresh the detail by forcing fallback reload.
+      // Simplest: clear navBooking usage by reloading page state.
+      // We do a lightweight reload: set to idle and let useEffect run.
+      setActionState({ status: "idle" });
+      nav("/dashboard/bookings");
+    } catch (err: any) {
+      setActionState({ status: "error", message: err?.message || "Approve failed" });
+    }
+  }
 
-      // Refresh list snapshot in-place (no drift): re-run the existing fallback loader by forcing reload.
-      // Simplest deterministic approach: just hard reload current page.
-      window.location.reload();
+  async function handleReject() {
+    if (!bookingId) return;
+
+    setActionState({ status: "working" });
+
+    try {
+      const res = await apiFetch(`/api/v1/dashboard/bookings/${encodeURIComponent(String(bookingId))}/reject`, {
+        method: "POST",
+      });
+      const json = (await res.json().catch(() => ({}))) as any;
+
+      if (!res.ok || json?.ok === false) {
+        const msg = json?.message || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      setActionState({ status: "idle" });
+      nav("/dashboard/bookings");
     } catch (err: any) {
       setActionState({ status: "error", message: err?.message || "Reject failed" });
     }
   }
+
+  const [actionState, setActionState] = useState<{ status: "idle" | "working" | "ok" | "error"; message?: string }>({
+    status: "idle",
+  });
 
   const sections = useMemo(() => {
     if (!booking) return null;
@@ -345,48 +369,34 @@ export default function BookingDetailPage() {
           {/* Actions (disabled for now) */}
           <div style={styles.card}>
             <div style={styles.sectionTitle}>Actions</div>
-                        {actionState.status === "error" ? (
+
+            {actionState.status === "error" ? (
               <div style={{ ...styles.bannerError, marginBottom: 10 }}>
                 <strong>Action failed.</strong>
                 <div style={{ marginTop: 6 }}>{actionState.message}</div>
               </div>
             ) : null}
 
-            {actionState.status === "ok" ? (
-              <div
-                style={{
-                  border: "1px solid rgba(16,185,129,0.35)",
-                  background: "rgba(16,185,129,0.10)",
-                  borderRadius: 12,
-                  padding: 12,
-                  marginBottom: 10,
-                }}
-              >
-                <strong>Success.</strong>
-                <div style={{ marginTop: 6 }}>{actionState.message}</div>
-              </div>
-            ) : null}
             <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 10 }}>
-              Actions are intentionally disabled until we lock the UI workflow. Backend approve/reject endpoints exist, but we are not wiring mutations in Phase 8.7 P1.
+              Approve/Reject are now wired to the backend endpoints. This is the Phase 8.7 P1 moderation workflow.
             </div>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              <button disabled style={styles.actionBtnDisabled}>Approve Booking</button>
+              <button
+                onClick={handleApprove}
+                disabled={actionState.status === "working"}
+                style={actionState.status === "working" ? styles.actionBtnDisabled : styles.actionBtn}
+              >
+                Approve Booking
+              </button>
 
               <button
-                onClick={onReject}
+                onClick={handleReject}
                 disabled={actionState.status === "working"}
-                style={{
-                  ...styles.actionBtnDisabled,
-                  cursor: actionState.status === "working" ? "not-allowed" : "pointer",
-                  opacity: actionState.status === "working" ? 0.65 : 1,
-                }}
+                style={actionState.status === "working" ? styles.actionBtnDisabled : styles.actionBtnDanger}
               >
                 Reject Booking
               </button>
-
-              <button disabled style={styles.actionBtnDisabled}>Resend Payment Link</button>
-              <button disabled style={styles.actionBtnDisabled}>Mark Manual Review Resolved</button>
             </div>
           </div>
 
@@ -469,6 +479,24 @@ const styles: Record<string, React.CSSProperties> = {
   v: { flex: 1, fontSize: 12, fontWeight: 700, opacity: 0.9, wordBreak: "break-word" },
   mono: { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace" },
 
+  actionBtn: {
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "rgba(0,0,0,0.02)",
+    cursor: "pointer",
+    fontWeight: 950,
+  },
+
+  actionBtnDanger: {
+    padding: "10px 12px",
+    borderRadius: 12,
+    border: "1px solid rgba(220,38,38,0.30)",
+    background: "rgba(220,38,38,0.08)",
+    cursor: "pointer",
+    fontWeight: 950,
+  },
+
   actionBtnDisabled: {
     padding: "10px 12px",
     borderRadius: 12,
@@ -479,3 +507,4 @@ const styles: Record<string, React.CSSProperties> = {
     opacity: 0.65,
   },
 };
+
