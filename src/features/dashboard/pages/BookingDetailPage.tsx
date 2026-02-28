@@ -161,6 +161,10 @@ export default function BookingDetailPage() {
     return { status: "idle" };
   });
 
+  const [actionState, setActionState] = useState<{ status: "idle" | "working" | "ok" | "error"; message?: string }>({
+    status: "idle",
+  });
+
   useEffect(() => {
     let isMounted = true;
 
@@ -202,7 +206,7 @@ export default function BookingDetailPage() {
 
   const booking = state.status === "ok" ? state.booking : null;
 
-    async function handleApprove() {
+  async function handleApprove() {
     if (!bookingId) return;
 
     setActionState({ status: "working" });
@@ -221,15 +225,70 @@ export default function BookingDetailPage() {
       // After approve, refresh the detail by forcing fallback reload.
       // Simplest: clear navBooking usage by reloading page state.
       // We do a lightweight reload: set to idle and let useEffect run.
-      setActionState({ status: "idle" });
-      nav("/dashboard/bookings");
+      const checkoutUrl = json?.checkout_url ? String(json.checkout_url) : "";
+      const checkoutSessionId = json?.stripe_checkout_session_id ? String(json.stripe_checkout_session_id) : "";
+
+      if (checkoutUrl) {
+        setActionState({ status: "ok", message: "Redirecting to Stripe Checkout…" });
+        window.location.href = checkoutUrl; // same-tab (owner decision)
+        return;
+      }
+
+      // checkout_url missing/null — deterministic stop (no navigation)
+      // Poseidon/DIR: UI does not interpret Stripe lifecycle. Backend must return a usable checkout_url.
+      if (checkoutSessionId) {
+        setActionState({
+          status: "error",
+          message: "Payment link could not be created. Please click Regenerate Payment Link to create a fresh checkout session.",
+        });
+        return;
+      }
+
+      setActionState({
+        status: "error",
+        message: "Approve succeeded but no checkout link was returned. Do not navigate. Use Regenerate Link (next step) or return to queue.",
+      });
+      return;
     } catch (err: any) {
       setActionState({ status: "error", message: err?.message || "Approve failed" });
     }
   }
 
+  async function handleRegeneratePaymentLink() {
+    if (!bookingId) return;
+
+    setActionState({ status: "working" });
+
+    try {
+      const res = await apiFetch(
+        `/api/v1/dashboard/bookings/${encodeURIComponent(String(bookingId))}/approve?force_new=1`,
+        { method: "POST" }
+      );
+
+      const json = (await res.json().catch(() => ({}))) as any;
+
+      if (!res.ok || json?.ok === false) {
+        const msg = json?.message || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      const checkoutUrl = json?.checkout_url ? String(json.checkout_url) : "";
+      if (!checkoutUrl) {
+        throw new Error("Regenerate succeeded but no checkout_url was returned.");
+      }
+
+      setActionState({ status: "ok", message: "Redirecting to Stripe Checkout…" });
+      window.location.href = checkoutUrl;
+    } catch (err: any) {
+      setActionState({ status: "error", message: err?.message || "Regenerate failed" });
+    }
+  }
+
   async function handleReject() {
     if (!bookingId) return;
+
+    const yes = window.confirm(`Reject (cancel) booking #${String(bookingId)}? This cannot be undone.`);
+    if (!yes) return; 
 
     setActionState({ status: "working" });
 
@@ -250,10 +309,6 @@ export default function BookingDetailPage() {
       setActionState({ status: "error", message: err?.message || "Reject failed" });
     }
   }
-
-  const [actionState, setActionState] = useState<{ status: "idle" | "working" | "ok" | "error"; message?: string }>({
-    status: "idle",
-  });
 
   const sections = useMemo(() => {
     if (!booking) return null;
@@ -295,7 +350,11 @@ export default function BookingDetailPage() {
         </div>
       ) : null}
 
-      {state.status === "not_found" ? <div style={styles.card}>Booking not found.</div> : null}
+      {state.status === "not_found" ? (
+        <div style={styles.card}>
+          Booking not found in the currently loaded week. Go back to Bookings and select the correct week.
+        </div>
+      ) : null}
 
       {state.status === "ok" && booking && sections ? (
         <>
@@ -373,7 +432,19 @@ export default function BookingDetailPage() {
             {actionState.status === "error" ? (
               <div style={{ ...styles.bannerError, marginBottom: 10 }}>
                 <strong>Action failed.</strong>
-                <div style={{ marginTop: 6 }}>{actionState.message}</div>
+                <div style={{ marginTop: 6, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{actionState.message}</div>
+              </div>
+            ) : null}
+
+            {actionState.status === "error" && String(actionState.message || "").includes("Checkout already created") ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+                <button
+                  onClick={handleRegeneratePaymentLink}
+                  disabled={false}
+                  style={styles.actionBtn}
+                >
+                  Regenerate Payment Link
+                </button>
               </div>
             ) : null}
 
