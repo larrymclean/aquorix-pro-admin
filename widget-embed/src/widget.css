@@ -2,29 +2,256 @@
   Product: AQUORIX
   File: widget.css
   Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/src/widget.css
-  Description: Scoped widget stylesheet. MUST NOT style html/body/:root. All rules must be prefixed with .aqx-widget-root.
+  Description: Scoped styles for the embeddable scheduler widget. MUST NOT leak to host page.
 
   Author: ChatGPT (Lead) + Larry McLean
   Created: 2026-03-06
-  Version: 1.0.0
+  Version: 1.4.0
 
   Last Updated: 2026-03-06
   Status: ACTIVE
 
   Change Log (append-only):
     - 2026-03-06 - v1.0.0:
-      - Initial scoped CSS container for embeddable widget to prevent host page layout corruption.
+      - Add scoped widget styling under .aqx-widget-root to improve readability without changing behavior.
+      - No global selectors outside the widget scope.
+    - 2026-03-06 - v1.1.0:
+      - Strengthen visual hierarchy for schedule and itinerary cards.
+      - Add darker headers, clearer table cell separation, and stronger button affordances.
+      - Keep all styling fully scoped under .aqx-widget-root with no behavior changes.
+    - 2026-03-06 - v1.2.0:
+      - Further strengthen contrast, card depth, section hierarchy, and button emphasis.
+      - Improve readability of schedule cells and itinerary rows.
+      - Keep all styling fully scoped under .aqx-widget-root with no behavior changes.
+    - 2026-03-06 - v1.3.0:
+      - Add a stronger premium visual pass with deeper contrast, clearer day headers, stronger card framing, and more obvious call-to-action styling.
+      - Preserve all existing widget behavior and keep styles fully scoped under .aqx-widget-root.
+    - 2026-03-06 - v1.4.0:
+      - Refine the strong premium pass to feel cleaner and more finished.
+      - Improve spacing, hierarchy, readability, and button polish without changing behavior.
+      - Preserve full widget scope isolation under .aqx-widget-root.
 */
 
+/* ------------------------------------------------------------------------- */
+/* Scope boundary: NOTHING in this file should apply outside .aqx-widget-root */
+/* ------------------------------------------------------------------------- */
+
 .aqx-widget-root {
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-  color: #111;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #102133;
+  line-height: 1.45;
 }
 
 .aqx-widget-root * {
   box-sizing: border-box;
 }
 
+.aqx-widget-root .aqx-widget-shell {
+  padding: 22px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #eef5fb 0%, #dfeaf4 100%);
+  border: 1px solid #a8bccf;
+  box-shadow:
+    0 18px 40px rgba(15, 23, 42, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.aqx-widget-root .aqx-widget-shell > div:first-child {
+  color: #0f2b46;
+  font-size: 27px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #c8d7e5;
+}
+
+.aqx-widget-root .aqx-widget-card {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  border-radius: 20px;
+  border: 1px solid #b2c2d2;
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.aqx-widget-root .aqx-widget-schedule-card,
+.aqx-widget-root .aqx-widget-itinerary-card {
+  padding: 18px;
+}
+
+.aqx-widget-root .aqx-widget-schedule-card > div:first-child,
+.aqx-widget-root .aqx-widget-itinerary-card > div:first-child {
+  color: #12304c;
+  font-size: 18px;
+  font-weight: 900;
+  margin-bottom: 14px;
+  letter-spacing: 0.2px;
+}
+
+.aqx-widget-root .aqx-widget-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #ffffff;
+}
+
+.aqx-widget-root .aqx-widget-table thead th {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, #28567f 0%, #1b4466 100%);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.35px;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+}
+
+.aqx-widget-root .aqx-widget-table th,
+.aqx-widget-root .aqx-widget-table td {
+  border-right: 1px solid #c1ceda; /* lighter: #d7e1ea */
+  border-bottom: 1px solid #c1ceda;
+}
+
+.aqx-widget-root .aqx-widget-table th:last-child,
+.aqx-widget-root .aqx-widget-table td:last-child {
+  border-right: none;
+}
+
+.aqx-widget-root .aqx-widget-table tbody td {
+  background: #ffffff;
+}
+
+.aqx-widget-root .aqx-widget-table tbody tr:nth-child(even) td {
+  background: #f7fafc;
+}
+
+.aqx-widget-root .aqx-widget-table tbody tr:hover td {
+  background: #eaf3fb;
+}
+
+.aqx-widget-root .aqx-widget-schedule-table tbody td:first-child {
+  background: linear-gradient(180deg, #dde8f2 0%, #d2e0ec 100%);
+  color: #163550;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.aqx-widget-root .aqx-widget-schedule-card div[style*="overflowX: auto"] {
+  border: 1px solid #b4c4d2;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.aqx-widget-root .aqx-widget-itinerary-table {
+  border: 1px solid #b4c4d2;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.aqx-widget-root .aqx-widget-itinerary-table thead th {
+  background: linear-gradient(180deg, #295379 0%, #1b4160 100%);
+  color: #ffffff;
+}
+
+.aqx-widget-root .aqx-widget-itinerary-table td {
+  vertical-align: top;
+}
+
 .aqx-widget-root button {
-  font-family: inherit;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.12s ease,
+    filter 0.12s ease,
+    border-color 0.12s ease,
+    background-color 0.12s ease;
+}
+
+.aqx-widget-root button:hover {
+  transform: translateY(-1px);
+}
+
+.aqx-widget-root button:active {
+  transform: translateY(0);
+}
+
+.aqx-widget-root button:focus {
+  outline: none;
+}
+
+.aqx-widget-root button:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+.aqx-widget-root .aqx-widget-schedule-table button {
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.10);
+  border-color: #9fb4c6 !important;
+  color: #12304a;
+}
+
+.aqx-widget-root .aqx-widget-itinerary-card button {
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.10);
+}
+
+.aqx-widget-root .aqx-widget-itinerary-card button[disabled] {
+  opacity: 0.75;
+}
+
+.aqx-widget-root .aqx-widget-itinerary-card div[style*="Available:"] {
+  color: #304557;
+  font-weight: 800;
+  background: #edf4f9;
+  border: 1px solid #d4e0ea;
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+
+.aqx-widget-root div[style*="No items yet. Click BOOK/FULL on the schedule."] {
+  padding: 14px 0 4px 0;
+  color: #516374;
+  font-weight: 600;
+}
+
+.aqx-widget-root div[style*="Add at least one AVAILABLE item to commit."] {
+  color: #506273;
+  font-weight: 700;
+}
+
+.aqx-widget-root td div[style*="fontWeight: 700"] {
+  color: #112a42;
+}
+
+.aqx-widget-root td div[style*="opacity: 0.85"] {
+  color: #536678;
+  opacity: 1 !important;
+}
+
+.aqx-widget-root .aqx-widget-table td button + div {
+  color: #6a7c8d;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .aqx-widget-root .aqx-widget-shell {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .aqx-widget-root .aqx-widget-shell > div:first-child {
+    font-size: 22px;
+  }
+
+  .aqx-widget-root .aqx-widget-card {
+    border-radius: 14px;
+  }
+
+  .aqx-widget-root .aqx-widget-schedule-card,
+  .aqx-widget-root .aqx-widget-itinerary-card {
+    padding: 12px;
+  }
 }

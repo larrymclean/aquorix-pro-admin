@@ -34,6 +34,45 @@ import type { ItineraryItem, ItineraryPayload } from "./lib/itineraryTypes"
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const
 const LS_KEY = "aqx_widget_itinerary_v1"
 
+const DAY_INDEX: Record<(typeof DAYS_ORDER)[number], number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+}
+
+function getWeekStart(date: Date): Date {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - d.getDay())
+  return d
+}
+
+function formatDateLabel(date: Date): string {
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+function formatWeekdayFromDateLabel(dateLabel: string): string {
+  const [month, day] = dateLabel.split(" ")
+  const d = new Date(`${month} ${day}, ${new Date().getFullYear()}`)
+  return d.toLocaleDateString("en-US", { weekday: "long" })
+}
+
+function getWeekDates(startDate: Date): Record<(typeof DAYS_ORDER)[number], string> {
+  const out = {} as Record<(typeof DAYS_ORDER)[number], string>
+
+  DAYS_ORDER.forEach((day) => {
+    const d = new Date(startDate)
+    d.setDate(startDate.getDate() + DAY_INDEX[day])
+    out[day] = formatDateLabel(d)
+  })
+
+  return out
+}
+
 function makeItemId(day: string, time: string, name: string): string {
   return `${day}__${time}__${name}`.replace(/\s+/g, "_").toLowerCase()
 }
@@ -62,6 +101,11 @@ export default function App() {
   const [data, setData] = useState<ScheduleJson | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [itinerary, setItinerary] = useState<ItineraryItem[]>(() => safeLoadItinerary())
+  const [currentWeekStartDate] = useState<Date>(() => getWeekStart(new Date()))
+
+  const weekDates = useMemo(() => {
+    return getWeekDates(currentWeekStartDate)
+  }, [currentWeekStartDate])
 
   useEffect(() => {
     safeSaveItinerary(itinerary)
@@ -89,7 +133,7 @@ export default function App() {
     return data?.schedule || []
   }, [data])
 
-  function addToItinerary(day: string, row: LegacyScheduleRow) {
+  function addToItinerary(day: (typeof DAYS_ORDER)[number], row: LegacyScheduleRow) {
     const cell = row.days[day]
     if (!cell) return
 
@@ -106,6 +150,7 @@ export default function App() {
           day,
           time: row.time,
           name: cell.name,
+          dateLabel: weekDates[day],
           entryType: cell.entryType,
         },
       ]
@@ -144,7 +189,7 @@ export default function App() {
   const waitlistCount = itinerary.filter((x) => x.kind === "waitlist").length
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" }}>
+      <div className="aqx-widget-shell" style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" }}>
       <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>AQUORIX Scheduler Widget (Parity Mode)</div>
 
       {error && (
@@ -158,17 +203,18 @@ export default function App() {
 
       {!error && data && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
-          <div style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
+          <div className="aqx-widget-card aqx-widget-schedule-card" style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
             <div style={{ fontWeight: 700, marginBottom: 10 }}>Schedule</div>
 
             <div style={{ overflowX: "auto" }}>
-              <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 780 }}>
+              <table className="aqx-widget-table aqx-widget-schedule-table" style={{ borderCollapse: "collapse", width: "100%", minWidth: 780 }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea" }}>Time</th>
                     {DAYS_ORDER.map((d) => (
                       <th key={d} style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea" }}>
-                        {d}
+                        <div>{d}</div>
+                        <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>{weekDates[d]}</div>
                       </th>
                     ))}
                   </tr>
@@ -215,7 +261,7 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
+          <div className="aqx-widget-card aqx-widget-itinerary-card" style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
               <div style={{ fontWeight: 700 }}>Itinerary</div>
               <div style={{ fontSize: 12, opacity: 0.85 }}>
@@ -227,10 +273,11 @@ export default function App() {
 
             {itinerary.length > 0 && (
               <div style={{ marginTop: 10 }}>
-                <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                <table className="aqx-widget-table aqx-widget-itinerary-table" style={{ borderCollapse: "collapse", width: "100%" }}>
                   <thead>
                     <tr>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Day</th>
+                      <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Date</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Time</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Item</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Status</th>
@@ -240,7 +287,8 @@ export default function App() {
                   <tbody>
                     {itinerary.map((item) => (
                       <tr key={item.id}>
-                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{item.day}</td>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{formatWeekdayFromDateLabel(item.dateLabel)}</td>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{item.dateLabel}</td>
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{item.time}</td>
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>
                           <div style={{ fontWeight: 700 }}>{item.name}</div>
