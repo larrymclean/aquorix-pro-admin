@@ -1,0 +1,73 @@
+/*
+  Product: AQUORIX
+  File: App.tsx
+  Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/src/App.tsx
+  Description: Phase 9 embeddable scheduler widget shell. Loads legacy schedule JSON in parity mode and renders a raw preview.
+
+  Author: ChatGPT (Lead) + Larry McLean
+  Created: 2026-03-05
+  Version: 1.0.2
+
+  Last Updated: 2026-03-05
+  Status: ACTIVE
+
+  Change Log (append-only):
+    - 2026-03-05 - v1.0.0:
+      - Initial widget shell: fetch legacy schedule JSON and render raw preview for parity plumbing verification.
+      - 2026-03-05 - v1.0.1: - Fix TypeScript build error by avoiding JSX boolean conditions on unknown schedule payload. - Use explicit null checks for render gating while preserving ScheduleJson as unknown for safety.
+      - 2026-03-05 - v1.0.2: - Add JSON length + scroll hint to eliminate ambiguity about truncated preview
+*/
+
+import { useEffect, useState } from "react"
+import { fetchLegacySchedule } from "./lib/scheduleProvider"
+import type { ScheduleJson } from "./lib/scheduleProvider"
+
+export default function App() {
+  const [data, setData] = useState<ScheduleJson | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+
+    fetchLegacySchedule()
+      .then((json) => {
+        if (!mounted) return
+        setData(json)
+      })
+      .catch((err: any) => {
+        if (!mounted) return
+        setError(String(err?.message || err))
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const pretty = data !== null ? JSON.stringify(data, null, 2) : ""
+
+  return (
+    <div style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" }}>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>AQUORIX Scheduler Widget (Parity Mode)</div>
+
+      {error && (
+        <div style={{ padding: 12, background: "#ffecec", border: "1px solid #ffb3b3", borderRadius: 8 }}>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Schedule load failed</div>
+          <div style={{ whiteSpace: "pre-wrap" }}>{error}</div>
+        </div>
+      )}
+
+      {!error && !data && <div>Loading schedule...</div>}
+
+      {!error && data !== null && (
+        <div style={{ marginTop: 12 }}>
+           <div style={{ fontWeight: 600, marginBottom: 6 }}>Raw schedule JSON</div>
+          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Bytes: {pretty.length} (scroll inside the box to see full JSON)</div>
+          <pre style={{ padding: 12, background: "#f6f7f8", borderRadius: 8, overflow: "auto", maxHeight: 420 }}>
+            {pretty}
+          </pre>
+        </div>
+      )}
+    </div>
+  )
+}

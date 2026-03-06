@@ -1,0 +1,39 @@
+<!--
+  Product: AQUORIX
+  File: embed.html
+  Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/public/embed.html
+  Description: Plain HTML host page for testing the embeddable Phase 9 scheduler widget bundle (IIFE + mount()).
+
+  Author: ChatGPT (Lead) + Larry McLean
+  Created: 2026-03-05
+  Version: 1.0.3
+
+  Last Updated: 2026-03-06
+  Status: ACTIVE
+
+  Change Log (append-only):
+    - 2026-03-05 - v1.0.0:
+      - Initial embed host page that loads the widget IIFE bundle and mounts into #aqx-widget.
+    - 2026-03-05 - v1.0.1: - Fix widget global name mismatch (AquorixSchedulerWidget). - Add host-page diagnostics to surface mount errors in-page.
+    - 2026-03-06 - v1.0.2: - Fix widget global name mismatch (AquorixSchedulerWidget). - Add host-page diagnostics to surface mount errors in-page.
+    - 2026-03-06 - v1.0.3:
+      - Remove host-level global stylesheet link to prevent layout corruption.
+      - Add cache-busting query string to widget bundle script to avoid stale loads.
+-->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AQUORIX Widget Embed Demo</title>
+  </head>
+  <body>
+    <h2>Embed Host Page</h2>
+    <div id="aqx-widget" style="border: 1px solid #ccc; padding: 12px; border-radius: 10px;"></div>
+
+    <script type="module">
+      import { mount } from "/src/widget.tsx"
+      mount("#aqx-widget", { operatorSlug: "demo-operator" })
+    </script>
+  </body>
+</html>

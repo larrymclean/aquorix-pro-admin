@@ -1,0 +1,61 @@
+<!--
+  Product: AQUORIX
+  File: embed.html
+  Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/public/embed.html
+  Description: Plain HTML host page for testing the embeddable Phase 9 scheduler widget bundle (IIFE + mount()).
+
+  Author: ChatGPT (Lead) + Larry McLean
+  Created: 2026-03-05
+  Version: 1.0.1
+
+  Last Updated: 2026-03-05
+  Status: ACTIVE
+
+  Change Log (append-only):
+    - 2026-03-05 - v1.0.0:
+      - Initial embed host page that loads the widget IIFE bundle and mounts into #aqx-widget.
+    - 2026-03-05 - v1.0.1: - Fix widget global name mismatch (AquorixSchedulerWidget). - Add host-page diagnostics to surface mount errors in-page.
+-->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AQUORIX Widget Embed Demo</title>
+  </head>
+  <body>
+    <h2>Embed Host Page</h2>
+    <div id="aqx-widget" style="border: 1px solid #ccc; padding: 12px; border-radius: 10px;"></div>
+
+    <script src="/aquorix-scheduler-widget.iife.js"></script>
+        <script>
+      (function () {
+        var host = document.getElementById("aqx-widget")
+        function fail(msg) {
+          if (host) {
+            host.innerHTML =
+              '<div style="padding:12px;border:1px solid #ffb3b3;background:#ffecec;border-radius:8px;">' +
+              '<div style="font-weight:700;margin-bottom:6px;">Widget mount failed</div>' +
+              '<div style="white-space:pre-wrap;">' + msg + "</div>" +
+              "</div>"
+          }
+          try { console.error(msg) } catch (e) {}
+        }
+
+        try {
+          if (!window.AquorixSchedulerWidget) {
+            fail("window.AquorixSchedulerWidget is undefined. Bundle loaded but global is missing.")
+            return
+          }
+          if (typeof window.AquorixSchedulerWidget.mount !== "function") {
+            fail("window.AquorixSchedulerWidget.mount is not a function. Keys: " + Object.keys(window.AquorixSchedulerWidget).join(", "))
+            return
+          }
+          window.AquorixSchedulerWidget.mount("#aqx-widget", { operatorSlug: "demo-operator" })
+        } catch (err) {
+          fail(String((err && err.message) ? err.message : err))
+        }
+      })()
+    </script>
+  </body>
+</html>

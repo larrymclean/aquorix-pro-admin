@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AQUORIX Widget Embed Demo</title>
+  </head>
+  <body>
+    <h2>Embed Host Page</h2>
+    <div id="aqx-widget" style="border: 1px solid #ccc; padding: 12px; border-radius: 10px;"></div>
+
+    <script src="../dist/aquorix-scheduler-widget.iife.js"></script>
+    <script>
+      window.AquorixSchedulerWidget.mount("#aqx-widget", { operatorSlug: "demo-operator" })
+    </script>
+  </body>
+</html>

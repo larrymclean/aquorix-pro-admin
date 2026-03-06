@@ -1,0 +1,30 @@
+/*
+  Product: AQUORIX
+  File: widget.css
+  Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/src/widget.css
+  Description: Scoped widget stylesheet. MUST NOT style html/body/:root. All rules must be prefixed with .aqx-widget-root.
+
+  Author: ChatGPT (Lead) + Larry McLean
+  Created: 2026-03-06
+  Version: 1.0.0
+
+  Last Updated: 2026-03-06
+  Status: ACTIVE
+
+  Change Log (append-only):
+    - 2026-03-06 - v1.0.0:
+      - Initial scoped CSS container for embeddable widget to prevent host page layout corruption.
+*/
+
+.aqx-widget-root {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: #111;
+}
+
+.aqx-widget-root * {
+  box-sizing: border-box;
+}
+
+.aqx-widget-root button {
+  font-family: inherit;
+}
