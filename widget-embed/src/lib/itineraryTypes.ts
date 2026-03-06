@@ -19,6 +19,7 @@
 export type ItineraryItemBase = {
   id: string
   day: string
+  isoDate: string
   dateLabel: string
   time: string
   name: string

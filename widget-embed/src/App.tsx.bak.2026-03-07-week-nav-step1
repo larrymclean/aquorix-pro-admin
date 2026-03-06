@@ -33,91 +33,38 @@ import type { ItineraryItem, ItineraryPayload } from "./lib/itineraryTypes"
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const
 const LS_KEY = "aqx_widget_itinerary_v1"
-const DESTINATION_TIME_ZONE = "Asia/Amman"
 
-type ViewMode = "rolling_today" | "calendar_week"
+const DAY_INDEX: Record<(typeof DAYS_ORDER)[number], number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+}
 
-function getTimeZoneDateParts(date: Date, timeZone: string): { year: number; month: number; day: number } {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+function getWeekStart(date: Date): Date {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - d.getDay())
+  return d
+}
+
+function formatDateLabel(date: Date): string {
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+function getWeekDates(startDate: Date): Record<(typeof DAYS_ORDER)[number], string> {
+  const out = {} as Record<(typeof DAYS_ORDER)[number], string>
+
+  DAYS_ORDER.forEach((day) => {
+    const d = new Date(startDate)
+    d.setDate(startDate.getDate() + DAY_INDEX[day])
+    out[day] = formatDateLabel(d)
   })
 
-  const parts = formatter.formatToParts(date)
-
-  const year = Number(parts.find((p) => p.type === "year")?.value)
-  const month = Number(parts.find((p) => p.type === "month")?.value)
-  const day = Number(parts.find((p) => p.type === "day")?.value)
-
-  return { year, month, day }
-}
-
-function getIsoDateInTimeZone(date: Date, timeZone: string): string {
-  const { year, month, day } = getTimeZoneDateParts(date, timeZone)
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-}
-
-function getDateFromIso(isoDate: string): Date {
-  return new Date(`${isoDate}T12:00:00Z`)
-}
-
-function addDaysToIso(isoDate: string, days: number): string {
-  const d = getDateFromIso(isoDate)
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
-function getWeekdayNameFromIso(isoDate: string): (typeof DAYS_ORDER)[number] {
-  const weekday = new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    weekday: "long",
-  }).format(getDateFromIso(isoDate))
-
-  return weekday as (typeof DAYS_ORDER)[number]
-}
-
-function formatDateLabelFromIso(isoDate: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    month: "short",
-    day: "numeric",
-  }).format(getDateFromIso(isoDate))
-}
-
-function formatHeaderLabelFromIso(isoDate: string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }).format(getDateFromIso(isoDate))
-}
-
-function getRollingWindowDates(startIsoDate: string): string[] {
-  return Array.from({ length: 7 }, (_, i) => addDaysToIso(startIsoDate, i))
-}
-
-function getMondayOnOrBeforeIso(isoDate: string): string {
-  const d = getDateFromIso(isoDate)
-  const day = d.getUTCDay()
-  const diff = day === 0 ? -6 : 1 - day
-  d.setUTCDate(d.getUTCDate() + diff)
-  return d.toISOString().slice(0, 10)
-}
-
-function getMondayOnOrAfterIso(isoDate: string): string {
-  const d = getDateFromIso(isoDate)
-  const day = d.getUTCDay()
-  const daysUntilMonday = day === 1 ? 0 : day === 0 ? 1 : 8 - day
-  d.setUTCDate(d.getUTCDate() + daysUntilMonday)
-  return d.toISOString().slice(0, 10)
-}
-
-function getCalendarWeekDates(anchorIsoDate: string): string[] {
-  const monday = getMondayOnOrBeforeIso(anchorIsoDate)
-  return Array.from({ length: 7 }, (_, i) => addDaysToIso(monday, i))
+  return out
 }
 
 function makeItemId(day: string, time: string, name: string): string {
@@ -145,54 +92,14 @@ function safeSaveItinerary(items: ItineraryItem[]) {
 }
 
 export default function App() {
-    const [data, setData] = useState<ScheduleJson | null>(null)
-    const [error, setError] = useState<string | null>(null)
-    const [itinerary, setItinerary] = useState<ItineraryItem[]>(() => safeLoadItinerary())
+  const [data, setData] = useState<ScheduleJson | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [itinerary, setItinerary] = useState<ItineraryItem[]>(() => safeLoadItinerary())
+  const [currentWeekStartDate] = useState<Date>(() => getWeekStart(new Date()))
 
-    const [destinationTimeZone] = useState<string>(DESTINATION_TIME_ZONE)
-    const [minDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), DESTINATION_TIME_ZONE))
-    const [viewMode, setViewMode] = useState<ViewMode>("rolling_today")
-    const [anchorDate, setAnchorDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), DESTINATION_TIME_ZONE))
-
-    const visibleDates = useMemo(() => {
-      return viewMode === "rolling_today"
-        ? getRollingWindowDates(anchorDate)
-        : getCalendarWeekDates(anchorDate)
-    }, [viewMode, anchorDate])
-
-      function handleNextWeek() {
-        if (viewMode === "rolling_today") {
-        const nextAnchorDate = getMondayOnOrAfterIso(minDate)
-        setViewMode("calendar_week")
-        setAnchorDate(nextAnchorDate)
-        return
-      }
-
-    setAnchorDate(addDaysToIso(anchorDate, 7))
-    }
-
-    function handlePreviousWeek() {
-      if (viewMode === "rolling_today") return
-
-      const previousAnchorDate = addDaysToIso(anchorDate, -7)
-
-      if (previousAnchorDate < minDate) {
-        setViewMode("rolling_today")
-        setAnchorDate(minDate)
-        return
-      }
-
-      setAnchorDate(previousAnchorDate)
-    }
-
-    const visibleDateHeaders = useMemo(() => {
-      return visibleDates.map((isoDate) => ({
-        isoDate,
-        weekday: getWeekdayNameFromIso(isoDate),
-        headerLabel: formatHeaderLabelFromIso(isoDate),
-        dateLabel: formatDateLabelFromIso(isoDate),
-      }))
-    }, [visibleDates])
+  const weekDates = useMemo(() => {
+    return getWeekDates(currentWeekStartDate)
+  }, [currentWeekStartDate])
 
   useEffect(() => {
     safeSaveItinerary(itinerary)
@@ -220,11 +127,11 @@ export default function App() {
     return data?.schedule || []
   }, [data])
 
-  function addToItinerary(day: (typeof DAYS_ORDER)[number], isoDate: string, dateLabel: string, row: LegacyScheduleRow) {
+  function addToItinerary(day: (typeof DAYS_ORDER)[number], row: LegacyScheduleRow) {
     const cell = row.days[day]
     if (!cell) return
 
-    const id = makeItemId(`${isoDate}_${day}`, row.time, cell.name)
+    const id = makeItemId(day, row.time, cell.name)
     const kind: ItineraryItem["kind"] = cell.spaceAvail > 0 ? "available" : "waitlist"
 
     setItinerary((prev) => {
@@ -235,10 +142,9 @@ export default function App() {
           id,
           kind,
           day,
-          isoDate,
           time: row.time,
           name: cell.name,
-          dateLabel,
+          dateLabel: weekDates[day],
           entryType: cell.entryType,
         },
       ]
@@ -280,25 +186,20 @@ export default function App() {
   .filter((x) => x.kind === "available")
   .reduce((sum) => sum + 45, 0)
 
-  const sortedItinerary = useMemo(() => {
-    return [...itinerary].sort((a, b) => {
-      if (a.isoDate !== b.isoDate) return a.isoDate.localeCompare(b.isoDate)
-      if (a.time !== b.time) return a.time.localeCompare(b.time)
-      return a.name.localeCompare(b.name)
-    })
-  }, [itinerary])
-
   // Dive Day numbering (divers think in dive days, not weekdays)
-    const diveDayMap = useMemo(() => {
-      const uniqueDates = Array.from(new Set(sortedItinerary.map((x) => x.isoDate)))
-      const map: Record<string, number> = {}
+  const diveDayMap = useMemo(() => {
+    const uniqueDates = Array.from(
+      new Set(itinerary.map((x) => x.dateLabel))
+    )
 
-      uniqueDates.forEach((isoDate, i) => {
-        map[isoDate] = i + 1
-      })
+    const map: Record<string, number> = {}
 
-      return map
-    }, [sortedItinerary])
+    uniqueDates.forEach((d, i) => {
+      map[d] = i + 1
+    })
+
+    return map
+  }, [itinerary])
 
   return (
       <div className="aqx-widget-shell" style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" }}>
@@ -316,58 +217,17 @@ export default function App() {
       {!error && data && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
           <div className="aqx-widget-card aqx-widget-schedule-card" style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>Schedule</div>
-                  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
-                    Time zone: {destinationTimeZone} | Mode: {viewMode === "rolling_today" ? "Today + 6 days" : "Monday-Sunday"}
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={handlePreviousWeek}
-                    disabled={viewMode === "rolling_today"}
-                    title={viewMode === "rolling_today" ? "Cannot go earlier than destination-local today" : "Go to previous week"}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: viewMode === "rolling_today" ? "1px solid #cfd6dd" : "1px solid #cfd6dd",
-                      background: viewMode === "rolling_today" ? "#e9ecef" : "#ffffff",
-                      color: viewMode === "rolling_today" ? "#7a7f87" : "#1f2933",
-                      cursor: viewMode === "rolling_today" ? "not-allowed" : "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Previous Week
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleNextWeek}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: "1px solid #cfd6dd",
-                      background: "#ffffff",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Next Week
-                  </button>
-                </div>
-              </div>
+            <div style={{ fontWeight: 700, marginBottom: 10 }}>Schedule</div>
 
             <div style={{ overflowX: "auto" }}>
               <table className="aqx-widget-table aqx-widget-schedule-table" style={{ borderCollapse: "collapse", width: "100%", minWidth: 780 }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea" }}>Time</th>
-                    {visibleDateHeaders.map((col) => (
-                      <th key={col.isoDate} style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea" }}>
-                        <div>{col.headerLabel}</div>
+                    {DAYS_ORDER.map((d) => (
+                      <th key={d} style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea" }}>
+                        <div>{d}</div>
+                        <div style={{ fontSize: 12, opacity: 0.8, marginTop: 2 }}>{weekDates[d]}</div>
                       </th>
                     ))}
                   </tr>
@@ -376,24 +236,22 @@ export default function App() {
                   {scheduleRows.map((row) => (
                     <tr key={row.time}>
                       <td style={{ padding: 10, borderBottom: "1px solid #f0f2f4", fontWeight: 700 }}>{row.time}</td>
-                                            {visibleDateHeaders.map((col) => {
-                        const day = col.weekday
+                      {DAYS_ORDER.map((day) => {
                         const cell = row.days[day]
-
                         if (!cell) {
-                          return <td key={col.isoDate} style={{ padding: 10, borderBottom: "1px solid #f0f2f4" }} />
+                          return <td key={day} style={{ padding: 10, borderBottom: "1px solid #f0f2f4" }} />
                         }
 
                         const isFull = cell.spaceAvail <= 0
                         const label = isFull ? "FULL" : `BOOK (${cell.spaceAvail})`
 
                         return (
-                          <td key={col.isoDate} style={{ padding: 10, borderBottom: "1px solid #f0f2f4", verticalAlign: "top" }}>
+                          <td key={day} style={{ padding: 10, borderBottom: "1px solid #f0f2f4", verticalAlign: "top" }}>
                             <div style={{ fontWeight: 700, marginBottom: 4 }}>{cell.name}</div>
                             <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 8 }}>{cell.entryType}</div>
                             <button
                               type="button"
-                              onClick={() => addToItinerary(day, col.isoDate, col.dateLabel, row)}
+                              onClick={() => addToItinerary(day, row)}
                               style={{
                                 padding: "8px 10px",
                                 borderRadius: 10,
@@ -442,10 +300,10 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedItinerary.map((item) => (
+                    {itinerary.map((item) => (
                       <tr key={item.id} style={{ background: item.kind === "waitlist" ? "#f7f7f7" : "transparent" }}>
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>
-                          {diveDayMap[item.isoDate] ?? "-"}
+                          {diveDayMap[item.dateLabel] ?? "-"}
                         </td>
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{item.day}</td>
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{item.dateLabel}</td>
