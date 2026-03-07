@@ -513,7 +513,7 @@ export default function App({ destinationTimeZone }: AppProps) {
 
           <div className="aqx-widget-card aqx-widget-itinerary-card" style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-              <div style={{ fontWeight: 700 }}>Itinerary</div>
+              <div style={{ fontWeight: 700 }}>Your Itinerary</div>
               <div style={{ fontSize: 12, opacity: 0.85 }}>
                 Available: {availableCount} | Waitlist: {waitlistCount}
               </div>
@@ -578,18 +578,40 @@ export default function App({ destinationTimeZone }: AppProps) {
                       </tr>
                     ))}
                   </tbody>
-                                    <tfoot>
+                  <tfoot>
+                    <tr>
+                      <td
+                        colSpan={8}
+                        style={{
+                          padding: 0,
+                          height: 0,
+                          lineHeight: 0,
+                          borderTop: "1px solid #d7dde3",
+                        }}
+                      ></td>
+                    </tr>
                     <tr>
                       <td
                         colSpan={6}
                         style={{
-                          textAlign: "right",
                           padding: 10,
                           fontWeight: 800,
-                          borderTop: "1px solid #d7dde3",
                         }}
                       >
-                        Subtotal
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span style={{ fontSize: 12, fontWeight: 500, color: "#5f6b76" }}>
+                            Only available dives are included in checkout. Waitlist items are tracked separately and not charged.
+                          </span>
+                          <span style={{ marginLeft: "auto" }}>Subtotal</span>
+                        </div>
                       </td>
                       <td
                         style={{
@@ -597,12 +619,13 @@ export default function App({ destinationTimeZone }: AppProps) {
                           padding: 10,
                           fontWeight: 800,
                           whiteSpace: "nowrap",
-                          borderTop: "1px solid #d7dde3",
                         }}
                       >
                         ${itineraryTotal.toFixed(2)}
                       </td>
-                      <td style={{ borderTop: "1px solid #d7dde3" }}></td>
+                      <td
+                        style={{}}
+                      ></td>
                     </tr>
 
                     <tr>
@@ -611,7 +634,7 @@ export default function App({ destinationTimeZone }: AppProps) {
                         style={{
                           padding: 10,
                           fontWeight: 800,
-                          borderTop: "1px solid #d7dde3",
+                          borderTop: "0",
                         }}
                       >
                         <div
@@ -822,8 +845,8 @@ export default function App({ destinationTimeZone }: AppProps) {
 
                 <div style={{ fontSize: 12, marginTop: 8, color: "#5f6b76" }}>
                   {availableCount === 0
-                    ? "Add at least one available dive to proceed. Waitlist items are tracked but not charged."
-                    : "Only available dives are included in checkout. Waitlist items are tracked separately and not charged."}
+                    ? "Add at least one available dive to proceed."
+                    : ""}
                 </div>
 
                                 {greenFinsModalOpen && (
