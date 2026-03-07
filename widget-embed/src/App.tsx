@@ -675,21 +675,6 @@ export default function App({ destinationTimeZone }: AppProps) {
                               Apply
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={clearPromoCode}
-                              style={{
-                                padding: "6px 8px",
-                                borderRadius: 8,
-                                border: "1px solid #cfd6dd",
-                                background: "#ffffff",
-                                cursor: "pointer",
-                                fontWeight: 700,
-                              }}
-                            >
-                              Clear
-                            </button>
-
                             {appliedPromoCode && (
                               <span style={{ fontSize: 12, color: "#075c31", fontWeight: 700 }}>
                                 {appliedPromoCode} applied
@@ -718,7 +703,28 @@ export default function App({ destinationTimeZone }: AppProps) {
                       >
                         -${promoDiscount.toFixed(2)}
                       </td>
-                      <td style={{ borderTop: "1px solid #d7dde3" }}></td>
+                                            <td
+                        style={{
+                          borderTop: "1px solid #d7dde3",
+                          textAlign: "right",
+                          padding: 10,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={clearPromoCode}
+                          style={{
+                            padding: "6px 8px",
+                            borderRadius: 8,
+                            border: "1px solid #cfd6dd",
+                            background: "#ffffff",
+                            cursor: "pointer",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </td>
                     </tr>
 
                     <tr>
