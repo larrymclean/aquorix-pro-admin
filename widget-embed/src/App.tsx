@@ -2,13 +2,13 @@
   Product: AQUORIX
   File: App.tsx
   Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/src/App.tsx
-  Description: Phase 9 embeddable scheduler widget (parity mode). Renders a weekly schedule grid from legacy JSON, manages itinerary, and provides commit redirect seam.
+  Description: Phase 9 embeddable scheduler widget. Renders a destination-local schedule grid from legacy JSON, manages itinerary state, supports rolling and calendar-week navigation, preserves available vs waitlist behavior, and prepares commit redirect seam behavior.
 
   Author: ChatGPT (Lead) + Larry McLean
-  Created: 2026-03-05
-  Version: 1.1.0
+  Created: 2026-03-0
+  Version: 1.2.1
 
-  Last Updated: 2026-03-06
+  Last Updated: 2026-03-07
   Status: ACTIVE
 
   Change Log (append-only):
@@ -24,6 +24,21 @@
         - Itinerary add/remove
         - Available vs waitlist separation (available-only commits)
         - Commit seam redirects to checkout URL with encoded payload
+    - 2026-03-07 - v1.2.0:
+      - Add destination-local rolling seven-day schedule view.
+      - Add calendar-week navigation with Previous Week and Next Week controls.
+      - Fix Next Week transition bug so first calendar week begins on the first Monday on or after minDate.
+      - Refactor schedule headers and schedule body to render from visible date columns.
+      - Add destinationTimeZone prop support for date calculations.
+      - Add isoDate to itinerary item handling for stable chronological sorting.
+      - Sort itinerary by isoDate, then time, then name.
+      - Rebuild Day No. logic from chronological unique isoDate groups.
+      - Improve itinerary accounting presentation and waitlist visual distinction.
+      - Improve commit button UX and helper messaging.
+    - 2026-03-07 - v1.2.1:
+      - Harden localStorage itinerary loading with runtime validation.
+      - Require isoDate and current canonical itinerary fields when restoring saved itinerary items.
+      - Prevent stale or pre-isoDate saved data from corrupting chronological sorting and Day No. logic.
 */
 
 import { useEffect, useMemo, useState } from "react"
@@ -33,7 +48,6 @@ import type { ItineraryItem, ItineraryPayload } from "./lib/itineraryTypes"
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const
 const LS_KEY = "aqx_widget_itinerary_v1"
-const DESTINATION_TIME_ZONE = "Asia/Amman"
 
 type ViewMode = "rolling_today" | "calendar_week"
 
@@ -128,9 +142,22 @@ function safeLoadItinerary(): ItineraryItem[] {
   try {
     const raw = localStorage.getItem(LS_KEY)
     if (!raw) return []
+
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed as ItineraryItem[]
+
+    return parsed.filter((item): item is ItineraryItem => {
+      return !!item
+        && typeof item.id === "string"
+        && typeof item.kind === "string"
+        && (item.kind === "available" || item.kind === "waitlist")
+        && typeof item.day === "string"
+        && typeof item.isoDate === "string"
+        && typeof item.dateLabel === "string"
+        && typeof item.time === "string"
+        && typeof item.name === "string"
+        && typeof item.entryType === "string"
+    })
   } catch {
     return []
   }
@@ -144,15 +171,18 @@ function safeSaveItinerary(items: ItineraryItem[]) {
   }
 }
 
-export default function App() {
+type AppProps = {
+  destinationTimeZone: string
+}
+
+export default function App({ destinationTimeZone }: AppProps) {
     const [data, setData] = useState<ScheduleJson | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [itinerary, setItinerary] = useState<ItineraryItem[]>(() => safeLoadItinerary())
 
-    const [destinationTimeZone] = useState<string>(DESTINATION_TIME_ZONE)
-    const [minDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), DESTINATION_TIME_ZONE))
+    const [minDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), destinationTimeZone))
     const [viewMode, setViewMode] = useState<ViewMode>("rolling_today")
-    const [anchorDate, setAnchorDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), DESTINATION_TIME_ZONE))
+    const [anchorDate, setAnchorDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), destinationTimeZone))
 
     const visibleDates = useMemo(() => {
       return viewMode === "rolling_today"
