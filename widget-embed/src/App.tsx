@@ -392,6 +392,13 @@ export default function App({ destinationTimeZone }: AppProps) {
 
   const finalTotal = Math.max(0, postPromoSubtotal - greenFinsDiscount)
 
+  const costPerDive = availableCount > 0 ? finalTotal / availableCount : 0
+
+  const confirmedDiveSummary =
+    availableCount > 0
+      ? `${availableCount} confirmed ${availableCount === 1 ? "dive" : "dives"} • $${costPerDive.toFixed(2)} per dive`
+      : ""
+
   function applyPromoCode() {
     const normalized = promoCodeInput.trim()
 
@@ -882,17 +889,36 @@ export default function App({ destinationTimeZone }: AppProps) {
 
                     <tr style={{ background: "#e6f4ec" }}>
                       <td
-                        colSpan={6}
-                        style={{
-                          textAlign: "right",
-                          padding: 12,
-                          fontWeight: 900,
-                          fontSize: 15,
-                          borderTop: "2px solid #0a7a43",
-                        }}
-                      >
-                        Total
-                      </td>
+                          colSpan={6}
+                          style={{
+                            padding: 12,
+                            fontWeight: 900,
+                            fontSize: 15,
+                            borderTop: "2px solid #0a7a43",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 12,
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "#075c31",
+                                textAlign: "left",
+                              }}
+                            >
+                              {confirmedDiveSummary}
+                            </span>
+
+                            <span style={{ marginLeft: "auto" }}>Total</span>
+                          </div>
+                        </td>
                       <td
                         style={{
                           textAlign: "right",
