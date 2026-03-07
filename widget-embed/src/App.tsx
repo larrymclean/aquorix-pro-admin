@@ -396,7 +396,7 @@ export default function App({ destinationTimeZone }: AppProps) {
 
   const confirmedDiveSummary =
     availableCount > 0
-      ? `${availableCount} confirmed ${availableCount === 1 ? "dive" : "dives"} • $${costPerDive.toFixed(2)} per dive`
+      ? `${availableCount} confirmed ${availableCount === 1 ? "dive" : "dives"} • $${costPerDive.toFixed(2)} per dive - Book now to reserve your seat and lock your price.`
       : ""
 
   function applyPromoCode() {
@@ -956,7 +956,7 @@ export default function App({ destinationTimeZone }: AppProps) {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          Commit
+                          Book Now
                         </button>
                       </td>
                     </tr>
