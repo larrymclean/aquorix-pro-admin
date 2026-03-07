@@ -932,33 +932,7 @@ export default function App({ destinationTimeZone }: AppProps) {
                       >
                         ${finalTotal.toFixed(2)}
                       </td>
-                      <td
-                        style={{
-                          borderTop: "2px solid #075c31",
-                          padding: 12,
-                          textAlign: "right",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={commitItinerary}
-                          disabled={availableCount === 0}
-                          title={availableCount === 0 ? "Add at least one available dive to proceed" : "Proceed to checkout"}
-                          style={{
-                            padding: "8px 12px",
-                            borderRadius: 10,
-                            border: availableCount === 0 ? "1px solid #cfd6dd" : "1px solid #075c31",
-                            background: availableCount === 0 ? "#e9ecef" : "#dff5e8",
-                            color: availableCount === 0 ? "#7a7f87" : "#075c31",
-                            cursor: availableCount === 0 ? "not-allowed" : "pointer",
-                            fontWeight: 900,
-                            boxShadow: availableCount === 0 ? "none" : "0 1px 2px rgba(0,0,0,0.08)",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Commit
-                        </button>
-                      </td>
+                      <td style={{ borderTop: "2px solid #075c31" }}></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -970,6 +944,26 @@ export default function App({ destinationTimeZone }: AppProps) {
                     style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #cfd6dd", background: "#ffffff", cursor: "pointer", fontWeight: 800 }}
                   >
                     Clear
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={commitItinerary}
+                    disabled={availableCount === 0}
+                    title={availableCount === 0 ? "Add at least one available dive to proceed" : "Proceed to checkout"}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: availableCount === 0 ? "1px solid #cfd6dd" : "1px solid #075c31",
+                      background: availableCount === 0 ? "#e9ecef" : "#dff5e8",
+                      color: availableCount === 0 ? "#7a7f87" : "#075c31",
+                      cursor: availableCount === 0 ? "not-allowed" : "pointer",
+                      fontWeight: 900,
+                      boxShadow: availableCount === 0 ? "none" : "0 1px 2px rgba(0,0,0,0.08)",
+                      opacity: availableCount === 0 ? 1 : 1,
+                    }}
+                  >
+                    Commit (Available Only)
                   </button>
                 </div>
 
