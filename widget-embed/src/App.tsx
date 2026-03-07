@@ -196,6 +196,10 @@ export default function App({ destinationTimeZone }: AppProps) {
     const [viewMode, setViewMode] = useState<ViewMode>("rolling_today")
     const [anchorDate, setAnchorDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), destinationTimeZone))
 
+    const [arrivalDate, setArrivalDate] = useState<string>(minDate)
+    const [departureDate, setDepartureDate] = useState<string>(() => addDaysToIso(minDate, 6))
+    const [diverCount, setDiverCount] = useState<number>(1)
+
     const visibleDates = useMemo(() => {
       return viewMode === "rolling_today"
         ? getRollingWindowDates(anchorDate)
@@ -460,7 +464,9 @@ export default function App({ destinationTimeZone }: AppProps) {
 
   return (
       <div className="aqx-widget-shell" style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" }}>
-      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>AQUORIX Scheduler Widget (Parity Mode) v1.0.0</div>
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+        Blue Current Divers Schedule & Itinerary Builder
+      </div>
 
       {error && (
         <div style={{ padding: 12, background: "#ffecec", border: "1px solid #ffb3b3", borderRadius: 8 }}>
@@ -474,85 +480,153 @@ export default function App({ destinationTimeZone }: AppProps) {
       {!error && data && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
           <div className="aqx-widget-card aqx-widget-schedule-card" style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>Schedule</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>
-                    {scheduleRangeLabel}
-                  </div>
-                  <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
-                    Time zone: {destinationTimeZone} | Mode: {viewMode === "rolling_today" ? "Today + 6 days" : "Monday-Sunday"}
-                  </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontWeight: 700 }}>Schedule</div>
+                <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>
+                  {scheduleRangeLabel}
                 </div>
-
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={handlePreviousMonth}
-                    disabled={viewMode === "rolling_today"}
-                    title={viewMode === "rolling_today" ? "Cannot go earlier than destination-local today" : "Go to previous month"}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: "1px solid #cfd6dd",
-                      background: viewMode === "rolling_today" ? "#e9ecef" : "#ffffff",
-                      color: viewMode === "rolling_today" ? "#7a7f87" : "#1f2933",
-                      cursor: viewMode === "rolling_today" ? "not-allowed" : "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Previous Month
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handlePreviousWeek}
-                    disabled={viewMode === "rolling_today"}
-                    title={viewMode === "rolling_today" ? "Cannot go earlier than destination-local today" : "Go to previous week"}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: viewMode === "rolling_today" ? "1px solid #cfd6dd" : "1px solid #cfd6dd",
-                      background: viewMode === "rolling_today" ? "#e9ecef" : "#ffffff",
-                      color: viewMode === "rolling_today" ? "#7a7f87" : "#1f2933",
-                      cursor: viewMode === "rolling_today" ? "not-allowed" : "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Previous Week
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleNextWeek}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: "1px solid #cfd6dd",
-                      background: "#ffffff",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Next Week
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleNextMonth}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 10,
-                      border: "1px solid #cfd6dd",
-                      background: "#ffffff",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Next Month
-                  </button>
+                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
+                  Time zone: {destinationTimeZone}
                 </div>
               </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  flexWrap: "wrap",
+                  padding: "8px 10px",
+                  border: "1px solid #e3e6ea",
+                  borderRadius: 10,
+                  background: "#f8fafc",
+                }}
+              >
+                <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  Arrival
+                  <input
+                    type="date"
+                    value={arrivalDate}
+                    onChange={(e) => setArrivalDate(e.target.value)}
+                    min={minDate}
+                    style={{
+                      marginTop: 4,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  Departure
+                  <input
+                    type="date"
+                    value={departureDate}
+                    onChange={(e) => setDepartureDate(e.target.value)}
+                    min={arrivalDate}
+                    style={{
+                      marginTop: 4,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  # Divers
+                  <select
+                    value={diverCount}
+                    onChange={(e) => setDiverCount(Number(e.target.value))}
+                    style={{
+                      marginTop: 4,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  >
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((count) => (
+                      <option key={count} value={count}>
+                        {count}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={handlePreviousMonth}
+                  disabled={viewMode === "rolling_today"}
+                  title={viewMode === "rolling_today" ? "Cannot go earlier than destination-local today" : "Go to previous month"}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #cfd6dd",
+                    background: viewMode === "rolling_today" ? "#e9ecef" : "#ffffff",
+                    color: viewMode === "rolling_today" ? "#7a7f87" : "#1f2933",
+                    cursor: viewMode === "rolling_today" ? "not-allowed" : "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  Previous Month
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePreviousWeek}
+                  disabled={viewMode === "rolling_today"}
+                  title={viewMode === "rolling_today" ? "Cannot go earlier than destination-local today" : "Go to previous week"}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #cfd6dd",
+                    background: viewMode === "rolling_today" ? "#e9ecef" : "#ffffff",
+                    color: viewMode === "rolling_today" ? "#7a7f87" : "#1f2933",
+                    cursor: viewMode === "rolling_today" ? "not-allowed" : "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  Previous Week
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleNextWeek}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #cfd6dd",
+                    background: "#ffffff",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  Next Week
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #cfd6dd",
+                    background: "#ffffff",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  Next Month
+                </button>
+              </div>
+            </div>
 
             <div style={{ overflowX: "auto" }}>
               <table className="aqx-widget-table aqx-widget-schedule-table" style={{ borderCollapse: "collapse", width: "100%", minWidth: 780 }}>
