@@ -224,6 +224,28 @@ export default function App({ destinationTimeZone }: AppProps) {
       }))
     }, [visibleDates])
 
+    const scheduleRangeLabel = useMemo(() => {
+    if (!visibleDates.length) return ""
+
+    const startIso = visibleDates[0]
+    const endIso = visibleDates[visibleDates.length - 1]
+
+    const start = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+    }).format(getDateFromIso(startIso))
+
+    const end = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(getDateFromIso(endIso))
+
+    return `${start} – ${end}`
+  }, [visibleDates])
+
   useEffect(() => {
     safeSaveItinerary(itinerary)
   }, [itinerary])
@@ -414,6 +436,9 @@ export default function App({ destinationTimeZone }: AppProps) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
                 <div>
                   <div style={{ fontWeight: 700 }}>Schedule</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>
+                    {scheduleRangeLabel}
+                  </div>
                   <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
                     Time zone: {destinationTimeZone} | Mode: {viewMode === "rolling_today" ? "Today + 6 days" : "Monday-Sunday"}
                   </div>
