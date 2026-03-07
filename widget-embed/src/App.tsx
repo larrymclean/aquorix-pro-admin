@@ -83,6 +83,18 @@ function addDaysToIso(isoDate: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
+function addMonthsToIso(isoDate: string, months: number): string {
+  const d = getDateFromIso(isoDate)
+  d.setUTCMonth(d.getUTCMonth() + months)
+  return d.toISOString().slice(0, 10)
+}
+
+function getFirstDayOfMonthIso(isoDate: string): string {
+  const d = getDateFromIso(isoDate)
+  d.setUTCDate(1)
+  return d.toISOString().slice(0, 10)
+}
+
 function getWeekdayNameFromIso(isoDate: string): (typeof DAYS_ORDER)[number] {
   const weekday = new Intl.DateTimeFormat("en-US", {
     timeZone: "UTC",
@@ -213,6 +225,28 @@ export default function App({ destinationTimeZone }: AppProps) {
       }
 
       setAnchorDate(previousAnchorDate)
+    }
+
+    function handleNextMonth() {
+      const nextMonthIso = addMonthsToIso(anchorDate, 1)
+      const firstDayNextMonthIso = getFirstDayOfMonthIso(nextMonthIso)
+
+      setViewMode("calendar_week")
+      setAnchorDate(firstDayNextMonthIso)
+    }
+
+    function handlePreviousMonth() {
+      const previousMonthIso = addMonthsToIso(anchorDate, -1)
+      const firstDayPreviousMonthIso = getFirstDayOfMonthIso(previousMonthIso)
+
+      if (firstDayPreviousMonthIso < minDate) {
+        setViewMode("rolling_today")
+        setAnchorDate(minDate)
+        return
+      }
+
+      setViewMode("calendar_week")
+      setAnchorDate(firstDayPreviousMonthIso)
     }
 
     const visibleDateHeaders = useMemo(() => {
@@ -444,7 +478,25 @@ export default function App({ destinationTimeZone }: AppProps) {
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={handlePreviousMonth}
+                    disabled={viewMode === "rolling_today"}
+                    title={viewMode === "rolling_today" ? "Cannot go earlier than destination-local today" : "Go to previous month"}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: "1px solid #cfd6dd",
+                      background: viewMode === "rolling_today" ? "#e9ecef" : "#ffffff",
+                      color: viewMode === "rolling_today" ? "#7a7f87" : "#1f2933",
+                      cursor: viewMode === "rolling_today" ? "not-allowed" : "pointer",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Previous Month
+                  </button>
+
                   <button
                     type="button"
                     onClick={handlePreviousWeek}
@@ -476,6 +528,21 @@ export default function App({ destinationTimeZone }: AppProps) {
                     }}
                   >
                     Next Week
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleNextMonth}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 10,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Next Month
                   </button>
                 </div>
               </div>
