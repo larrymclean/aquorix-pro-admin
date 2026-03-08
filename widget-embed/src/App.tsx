@@ -302,6 +302,24 @@ export default function App({ destinationTimeZone }: AppProps) {
     return `${start} – ${end}`
   }, [visibleDates])
 
+  const selectedTripLabel = useMemo(() => {
+  const start = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(getDateFromIso(arrivalDate))
+
+  const end = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(getDateFromIso(departureDate))
+
+  return `${start} – ${end}`
+}, [arrivalDate, departureDate])
+
   useEffect(() => {
     safeSaveItinerary(itinerary)
   }, [itinerary])
@@ -503,6 +521,9 @@ export default function App({ destinationTimeZone }: AppProps) {
                 <div style={{ fontWeight: 700 }}>Schedule</div>
                 <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>
                   {scheduleRangeLabel}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginTop: 2 }}>
+                  Trip: {selectedTripLabel}
                 </div>
                 <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
                   Time zone: {destinationTimeZone}
