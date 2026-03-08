@@ -1080,6 +1080,31 @@ const itineraryTotal = itinerary
                     : ""}
                 </div>
 
+                <div
+                  style={{
+                    marginTop: 14,
+                    textAlign: "center",
+                    fontSize: 11,
+                    color: "#7b8794",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  Scheduler v1.0.0 - Powered by{" "}
+                  <a
+                    href="https://www.aquorix.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: "#7b8794",
+                      textDecoration: "none",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    AQUORIX™
+                  </a>
+                </div>
+
                                 {greenFinsModalOpen && (
                   <div
                     role="dialog"
