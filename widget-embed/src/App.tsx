@@ -770,7 +770,7 @@ const itineraryTotal = itinerary
                   <tfoot>
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={9}
                         style={{
                           padding: 0,
                           height: 0,
@@ -787,20 +787,19 @@ const itineraryTotal = itinerary
                           fontWeight: 800,
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <span style={{ fontSize: 12, fontWeight: 500, color: "#5f6b76" }}>
-                            Only available dives are included in checkout. Waitlist items are tracked separately and not charged.
-                          </span>
-                          <span style={{ marginLeft: "auto" }}>Subtotal</span>
-                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 500, color: "#5f6b76" }}>
+                          Only available dives are included in checkout. Waitlist items are tracked separately and not charged.
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 10,
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Subtotal
                       </td>
                       <td
                         style={{
@@ -812,9 +811,7 @@ const itineraryTotal = itinerary
                       >
                         ${itineraryTotal.toFixed(2)}
                       </td>
-                      <td
-                        style={{}}
-                      ></td>
+                      <td></td>
                     </tr>
 
                     <tr>
@@ -826,59 +823,58 @@ const itineraryTotal = itinerary
                           borderTop: "0",
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                            <input
-                              type="text"
-                              value={promoCodeInput}
-                              onChange={(e) => setPromoCodeInput(e.target.value)}
-                              placeholder="Promo code"
-                              style={{
-                                padding: "6px 8px",
-                                borderRadius: 8,
-                                border: "1px solid #cfd6dd",
-                                width: 120,
-                              }}
-                            />
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <input
+                            type="text"
+                            value={promoCodeInput}
+                            onChange={(e) => setPromoCodeInput(e.target.value)}
+                            placeholder="Promo code"
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: 8,
+                              border: "1px solid #cfd6dd",
+                              width: 120,
+                            }}
+                          />
 
-                            <button
-                              type="button"
-                              onClick={applyPromoCode}
-                              style={{
-                                padding: "6px 8px",
-                                borderRadius: 8,
-                                border: "1px solid #cfd6dd",
-                                background: "#ffffff",
-                                cursor: "pointer",
-                                fontWeight: 700,
-                              }}
-                            >
-                              Apply
-                            </button>
+                          <button
+                            type="button"
+                            onClick={applyPromoCode}
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: 8,
+                              border: "1px solid #cfd6dd",
+                              background: "#ffffff",
+                              cursor: "pointer",
+                              fontWeight: 700,
+                            }}
+                          >
+                            Apply
+                          </button>
 
-                            {appliedPromoCode && (
-                              <span style={{ fontSize: 12, color: "#075c31", fontWeight: 700 }}>
-                                {appliedPromoCode} applied
-                              </span>
-                            )}
+                          {appliedPromoCode && (
+                            <span style={{ fontSize: 12, color: "#075c31", fontWeight: 700 }}>
+                              {appliedPromoCode} applied
+                            </span>
+                          )}
 
-                            {promoError && (
-                              <span style={{ fontSize: 12, color: "#b00020", fontWeight: 700 }}>
-                                {promoError}
-                              </span>
-                            )}
-                          </div>
-
-                          <span style={{ marginLeft: "auto" }}>Promo Code Discount</span>
+                          {promoError && (
+                            <span style={{ fontSize: 12, color: "#b00020", fontWeight: 700 }}>
+                              {promoError}
+                            </span>
+                          )}
                         </div>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 10,
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                          borderTop: "1px solid #d7dde3",
+                        }}
+                      >
+                        Promo Code Discount
                       </td>
                       <td
                         style={{
@@ -892,7 +888,7 @@ const itineraryTotal = itinerary
                       >
                         -${promoDiscount.toFixed(2)}
                       </td>
-                                            <td
+                      <td
                         style={{
                           borderTop: "1px solid #d7dde3",
                           textAlign: "right",
@@ -925,42 +921,41 @@ const itineraryTotal = itinerary
                           borderTop: "1px solid #d7dde3",
                         }}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 12,
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                            <button
-                              type="button"
-                              onClick={openGreenFinsModal}
-                              disabled={greenFinsEnabled}
-                              style={{
-                                padding: "6px 8px",
-                                borderRadius: 8,
-                                border: "1px solid #cfd6dd",
-                                background: greenFinsEnabled ? "#e6f4ec" : "#ffffff",
-                                cursor: greenFinsEnabled ? "not-allowed" : "pointer",
-                                fontWeight: 700,
-                                color: greenFinsEnabled ? "#075c31" : "#1f2933",
-                              }}
-                            >
-                              {greenFinsEnabled ? "Green Fins Applied (10% off)" : "Apply Green Fins"}
-                            </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            onClick={openGreenFinsModal}
+                            disabled={greenFinsEnabled}
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: 8,
+                              border: "1px solid #cfd6dd",
+                              background: greenFinsEnabled ? "#e6f4ec" : "#ffffff",
+                              cursor: greenFinsEnabled ? "not-allowed" : "pointer",
+                              fontWeight: 700,
+                              color: greenFinsEnabled ? "#075c31" : "#1f2933",
+                            }}
+                          >
+                            {greenFinsEnabled ? "Green Fins Applied (10% off)" : "Apply Green Fins"}
+                          </button>
 
-                            {greenFinsEnabled && greenFinsAgreedAt && (
-                              <span style={{ fontSize: 12, color: "#075c31", fontWeight: 700 }}>
-                                Agreed {new Date(greenFinsAgreedAt).toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-
-                          <span style={{ marginLeft: "auto" }}>Green Fins Discount</span>
+                          {greenFinsEnabled && greenFinsAgreedAt && (
+                            <span style={{ fontSize: 12, color: "#075c31", fontWeight: 700 }}>
+                              Agreed {new Date(greenFinsAgreedAt).toLocaleString()}
+                            </span>
+                          )}
                         </div>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 10,
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                          borderTop: "1px solid #d7dde3",
+                        }}
+                      >
+                        Green Fins Discount
                       </td>
                       <td
                         style={{
@@ -979,36 +974,36 @@ const itineraryTotal = itinerary
 
                     <tr style={{ background: "#e6f4ec" }}>
                       <td
-                          colSpan={6}
+                        colSpan={6}
+                        style={{
+                          padding: 12,
+                          borderTop: "2px solid #0a7a43",
+                        }}
+                      >
+                        <span
                           style={{
-                            padding: 12,
-                            fontWeight: 900,
-                            fontSize: 15,
-                            borderTop: "2px solid #0a7a43",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: "#075c31",
+                            textAlign: "left",
                           }}
                         >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              gap: 12,
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                color: "#075c31",
-                                textAlign: "left",
-                              }}
-                            >
-                              {confirmedDiveSummary}
-                            </span>
-
-                            <span style={{ marginLeft: "auto" }}>Total</span>
-                          </div>
-                        </td>
+                          {confirmedDiveSummary}
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 12,
+                          fontWeight: 900,
+                          fontSize: 15,
+                          color: "#075c31",
+                          borderTop: "2px solid #075c31",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Total
+                      </td>
                       <td
                         style={{
                           textAlign: "right",
