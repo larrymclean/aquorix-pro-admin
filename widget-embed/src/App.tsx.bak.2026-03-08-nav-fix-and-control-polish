@@ -239,28 +239,27 @@ export default function App({ destinationTimeZone }: AppProps) {
     }, [viewMode, anchorDate])
 
       function handleNextWeek() {
-        const nextAnchorDate =
-          viewMode === "rolling_today"
-            ? getMondayOnOrAfterIso(anchorDate)
-            : addDaysToIso(anchorDate, 7)
-
+        if (viewMode === "rolling_today") {
+        const nextAnchorDate = getMondayOnOrAfterIso(minDate)
         setViewMode("calendar_week")
         setAnchorDate(nextAnchorDate)
+        return
       }
 
-    function handlePreviousWeek() {
-      const previousAnchorDate =
-        viewMode === "rolling_today"
-          ? addDaysToIso(anchorDate, -7)
-          : addDaysToIso(anchorDate, -7)
+    setAnchorDate(addDaysToIso(anchorDate, 7))
+    }
 
-      if (previousAnchorDate <= minDate) {
+    function handlePreviousWeek() {
+      if (viewMode === "rolling_today") return
+
+      const previousAnchorDate = addDaysToIso(anchorDate, -7)
+
+      if (previousAnchorDate < minDate) {
         setViewMode("rolling_today")
         setAnchorDate(minDate)
         return
       }
 
-      setViewMode("calendar_week")
       setAnchorDate(previousAnchorDate)
     }
 
@@ -514,15 +513,7 @@ const itineraryTotal = itinerary
       {!error && data && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
           <div className="aqx-widget-card aqx-widget-schedule-card" style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr auto 1fr",
-                alignItems: "start",
-                gap: 12,
-                marginBottom: 10,
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontWeight: 700 }}>Schedule</div>
                 <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>
@@ -539,30 +530,28 @@ const itineraryTotal = itinerary
               <div
                 style={{
                   display: "flex",
-                  alignItems: "flex-end",
-                  justifyContent: "center",
-                  gap: 10,
+                  alignItems: "center",
+                  gap: 8,
                   flexWrap: "wrap",
-                  padding: "8px 12px",
+                  padding: "8px 10px",
                   border: "1px solid #e3e6ea",
                   borderRadius: 10,
                   background: "#f8fafc",
-                  margin: "0 auto",
                 }}
               >
 
                 <button
                   type="button"
                   onClick={handlePreviousWeek}
-                  disabled={anchorDate <= minDate}
-                  title={anchorDate <= minDate ? "Cannot go earlier than destination-local today" : "Go to previous week"}
+                  disabled={viewMode === "rolling_today"}
+                  title={viewMode === "rolling_today" ? "Cannot go earlier than destination-local today" : "Go to previous week"}
                   style={{
                     padding: "8px 10px",
                     borderRadius: 10,
                     border: "1px solid #cfd6dd",
-                    background: anchorDate <= minDate ? "#e9ecef" : "#ffffff",
-                    color: anchorDate <= minDate ? "#7a7f87" : "#1f2933",
-                    cursor: anchorDate <= minDate ? "not-allowed" : "pointer",
+                    background: viewMode === "rolling_today" ? "#e9ecef" : "#ffffff",
+                    color: viewMode === "rolling_today" ? "#7a7f87" : "#1f2933",
+                    cursor: viewMode === "rolling_today" ? "not-allowed" : "pointer",
                     fontWeight: 700,
                     whiteSpace: "nowrap",
                   }}
