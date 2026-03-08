@@ -373,66 +373,23 @@ export default function App({ destinationTimeZone }: AppProps) {
     setItinerary([])
   }
 
-    function commitItinerary() {
+  function commitItinerary() {
     const available = itinerary.filter((x) => x.kind === "available")
     const waitlist = itinerary.filter((x) => x.kind === "waitlist")
 
-    const subtotalMinor = Math.round(itineraryTotal * 100)
-    const promoDiscountMinor = Math.round(promoDiscount * 100)
-    const greenFinsDiscountMinor = Math.round(greenFinsDiscount * 100)
-    const totalMinor = Math.round(finalTotal * 100)
-
     const payload: ItineraryPayload = {
-      schemaVersion: "1.0",
       operatorSlug: "demo-operator",
-      operatorDisplayName: "Blue Current Divers",
-      timezone: destinationTimeZone,
-      currency: "USD",
       createdAtIso: new Date().toISOString(),
-      chargeableItems: available.map((x) => ({
-        itemId: x.id,
-        sessionKey: `${x.isoDate}__${x.time}__${x.name}`.replace(/\s+/g, "_").toLowerCase(),
-        soldItemLabel: `${x.isoDate} ${x.time} ${x.name} (${x.entryType})`,
-        day: x.day,
-        isoDate: x.isoDate,
-        dateLabel: x.dateLabel,
-        time: x.time,
-        name: x.name,
-        entryType: x.entryType,
-        pax: x.passengerCount,
-        unitPriceMinor: 4500,
-        lineTotalMinor: 4500 * x.passengerCount,
-        status: "AVAILABLE",
-      })),
-      waitlistItems: waitlist.map((x) => ({
-        itemId: x.id,
-        sessionKey: `${x.isoDate}__${x.time}__${x.name}`.replace(/\s+/g, "_").toLowerCase(),
-        soldItemLabel: `${x.isoDate} ${x.time} ${x.name} (${x.entryType})`,
-        day: x.day,
-        isoDate: x.isoDate,
-        dateLabel: x.dateLabel,
-        time: x.time,
-        name: x.name,
-        entryType: x.entryType,
-        pax: x.passengerCount,
-        status: "WAITLIST",
-      })),
-      discounts: {
-        promo: {
-          code: appliedPromoCode,
-          amountMinor: promoDiscountMinor,
-        },
-        greenFins: {
-          agreed: greenFinsEnabled,
-          amountMinor: greenFinsDiscountMinor,
-        },
-      },
-      subtotalMinor,
-      totalMinor,
+      available: available.map((x) => ({ ...x, kind: "available" })),
+      waitlist: waitlist.map((x) => ({ ...x, kind: "waitlist" })),
     }
 
+    // Canon rule: available items are the only chargeable cart items.
+    // Waitlist items are tracked but not billed.
     const encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))))
 
+    // Seam: redirect to checkout URL (placeholder for now).
+    // Later: replace "/checkout" with real generated checkout_url from backend.
     window.location.assign(`/checkout?aqx_payload=${encoded}`)
   }
 
