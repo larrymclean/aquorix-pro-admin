@@ -200,6 +200,24 @@ export default function App({ destinationTimeZone }: AppProps) {
     const [departureDate, setDepartureDate] = useState<string>(() => addDaysToIso(minDate, 6))
     const [diverCount, setDiverCount] = useState<number>(1)
 
+    useEffect(() => {
+      const safeArrival = arrivalDate < minDate ? minDate : arrivalDate
+
+      if (arrivalDate !== safeArrival) {
+        setArrivalDate(safeArrival)
+        return
+      }
+
+      setViewMode("rolling_today")
+      setAnchorDate(safeArrival)
+    }, [arrivalDate, minDate])
+
+    useEffect(() => {
+      if (departureDate < arrivalDate) {
+        setDepartureDate(arrivalDate)
+      }
+    }, [arrivalDate, departureDate])
+
     const visibleDates = useMemo(() => {
       return viewMode === "rolling_today"
         ? getRollingWindowDates(anchorDate)
