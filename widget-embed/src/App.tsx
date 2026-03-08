@@ -980,16 +980,46 @@ const itineraryTotal = itinerary
                           borderTop: "2px solid #0a7a43",
                         }}
                       >
-                        <span
+                        <div
                           style={{
-                            fontSize: 12,
-                            fontWeight: 600,
-                            color: "#075c31",
-                            textAlign: "left",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            flexWrap: "wrap",
                           }}
                         >
-                          {confirmedDiveSummary}
-                        </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "#075c31",
+                              textAlign: "left",
+                            }}
+                          >
+                            {confirmedDiveSummary}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={commitItinerary}
+                            disabled={availableCount === 0}
+                            title={availableCount === 0 ? "Add at least one available dive to proceed" : "Proceed to checkout"}
+                            style={{
+                              padding: "8px 12px",
+                              borderRadius: 10,
+                              border: availableCount === 0 ? "1px solid #cfd6dd" : "1px solid #075c31",
+                              background: availableCount === 0 ? "#e9ecef" : "#dff5e8",
+                              color: availableCount === 0 ? "#7a7f87" : "#075c31",
+                              cursor: availableCount === 0 ? "not-allowed" : "pointer",
+                              fontWeight: 900,
+                              boxShadow: availableCount === 0 ? "none" : "0 1px 2px rgba(0,0,0,0.08)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Book Now
+                          </button>
+                        </div>
                       </td>
                       <td
                         style={{
@@ -1026,37 +1056,23 @@ const itineraryTotal = itinerary
                       >
                         <button
                           type="button"
-                          onClick={commitItinerary}
-                          disabled={availableCount === 0}
-                          title={availableCount === 0 ? "Add at least one available dive to proceed" : "Proceed to checkout"}
+                          onClick={clearItinerary}
                           style={{
                             padding: "8px 12px",
                             borderRadius: 10,
-                            border: availableCount === 0 ? "1px solid #cfd6dd" : "1px solid #075c31",
-                            background: availableCount === 0 ? "#e9ecef" : "#dff5e8",
-                            color: availableCount === 0 ? "#7a7f87" : "#075c31",
-                            cursor: availableCount === 0 ? "not-allowed" : "pointer",
-                            fontWeight: 900,
-                            boxShadow: availableCount === 0 ? "none" : "0 1px 2px rgba(0,0,0,0.08)",
+                            border: "1px solid #cfd6dd",
+                            background: "#ffffff",
+                            cursor: "pointer",
+                            fontWeight: 800,
                             whiteSpace: "nowrap",
                           }}
                         >
-                          Book Now
+                          Clear
                         </button>
                       </td>
                     </tr>
                   </tfoot>
                 </table>
-
-                <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                  <button
-                    type="button"
-                    onClick={clearItinerary}
-                    style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #cfd6dd", background: "#ffffff", cursor: "pointer", fontWeight: 800 }}
-                  >
-                    Clear
-                  </button>
-                </div>
 
                 <div style={{ fontSize: 12, marginTop: 8, color: "#5f6b76" }}>
                   {availableCount === 0
