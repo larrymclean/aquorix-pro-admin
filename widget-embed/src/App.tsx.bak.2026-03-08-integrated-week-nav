@@ -539,26 +539,6 @@ const itineraryTotal = itinerary
                   background: "#f8fafc",
                 }}
               >
-
-                <button
-                  type="button"
-                  onClick={handlePreviousWeek}
-                  disabled={viewMode === "rolling_today"}
-                  title={viewMode === "rolling_today" ? "Cannot go earlier than destination-local today" : "Go to previous week"}
-                  style={{
-                    padding: "8px 10px",
-                    borderRadius: 10,
-                    border: "1px solid #cfd6dd",
-                    background: viewMode === "rolling_today" ? "#e9ecef" : "#ffffff",
-                    color: viewMode === "rolling_today" ? "#7a7f87" : "#1f2933",
-                    cursor: viewMode === "rolling_today" ? "not-allowed" : "pointer",
-                    fontWeight: 700,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Previous Week
-                </button>
-
                 <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#334155" }}>
                   Arrival
                   <input
@@ -613,6 +593,27 @@ const itineraryTotal = itinerary
                     ))}
                   </select>
                 </label>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+
+                <button
+                  type="button"
+                  onClick={handlePreviousWeek}
+                  disabled={viewMode === "rolling_today"}
+                  title={viewMode === "rolling_today" ? "Cannot go earlier than destination-local today" : "Go to previous week"}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #cfd6dd",
+                    background: viewMode === "rolling_today" ? "#e9ecef" : "#ffffff",
+                    color: viewMode === "rolling_today" ? "#7a7f87" : "#1f2933",
+                    cursor: viewMode === "rolling_today" ? "not-allowed" : "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  Previous Week
+                </button>
 
                 <button
                   type="button"
@@ -624,14 +625,12 @@ const itineraryTotal = itinerary
                     background: "#ffffff",
                     cursor: "pointer",
                     fontWeight: 700,
-                    whiteSpace: "nowrap",
                   }}
                 >
                   Next Week
                 </button>
 
               </div>
-
             </div>
 
             <div style={{ overflowX: "auto" }}>
