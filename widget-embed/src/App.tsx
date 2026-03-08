@@ -712,6 +712,7 @@ const itineraryTotal = itinerary
 
             {itinerary.length === 0 && <div style={{ marginTop: 10, opacity: 0.8 }}>No items yet. Click BOOK/FULL on the schedule.</div>}
 
+
             {itinerary.length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <table className="aqx-widget-table aqx-widget-itinerary-table" style={{ borderCollapse: "collapse", width: "100%" }}>
