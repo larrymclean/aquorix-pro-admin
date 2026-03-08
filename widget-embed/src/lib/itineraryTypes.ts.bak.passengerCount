@@ -24,7 +24,6 @@ export type ItineraryItemBase = {
   time: string
   name: string
   entryType: string
-  passengerCount: number
 }
 
 export type ItineraryAvailableItem = ItineraryItemBase & {

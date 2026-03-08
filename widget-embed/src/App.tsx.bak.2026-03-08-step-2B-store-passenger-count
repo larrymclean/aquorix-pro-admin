@@ -358,7 +358,6 @@ export default function App({ destinationTimeZone }: AppProps) {
           name: cell.name,
           dateLabel,
           entryType: cell.entryType,
-          passengerCount: diverCount,
         },
       ]
     })
@@ -392,18 +391,14 @@ export default function App({ destinationTimeZone }: AppProps) {
     window.location.assign(`/checkout?aqx_payload=${encoded}`)
   }
 
-const availableCount = itinerary.filter((x) => x.kind === "available").length
-const waitlistCount = itinerary.filter((x) => x.kind === "waitlist").length
+  const availableCount = itinerary.filter((x) => x.kind === "available").length
+  const waitlistCount = itinerary.filter((x) => x.kind === "waitlist").length
 
-const availablePassengerCount = itinerary
+  const itineraryTotal = itinerary
   .filter((x) => x.kind === "available")
-  .reduce((sum, x) => sum + x.passengerCount, 0)
+  .reduce((sum) => sum + 45, 0)
 
-const itineraryTotal = itinerary
-  .filter((x) => x.kind === "available")
-  .reduce((sum, x) => sum + (45 * x.passengerCount), 0)
-
-  const [promoCodeInput, setPromoCodeInput] = useState("")
+    const [promoCodeInput, setPromoCodeInput] = useState("")
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null)
   const [promoError, setPromoError] = useState<string | null>(null)
 
@@ -429,11 +424,11 @@ const itineraryTotal = itinerary
 
   const finalTotal = Math.max(0, postPromoSubtotal - greenFinsDiscount)
 
-  const costPerDive = availablePassengerCount > 0 ? finalTotal / availablePassengerCount : 0
+  const costPerDive = availableCount > 0 ? finalTotal / availableCount : 0
 
   const confirmedDiveSummary =
-    availablePassengerCount > 0
-      ? `${availablePassengerCount} confirmed ${availablePassengerCount === 1 ? "seat" : "seats"} across ${availableCount} ${availableCount === 1 ? "dive" : "dives"} • $${costPerDive.toFixed(2)} per diver per dive`
+    availableCount > 0
+      ? `${availableCount} confirmed ${availableCount === 1 ? "dive" : "dives"} • $${costPerDive.toFixed(2)} per dive - Book now to reserve your seat and lock your price.`
       : ""
 
   function applyPromoCode() {
@@ -709,7 +704,6 @@ const itineraryTotal = itinerary
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Date</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Time</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Activity</th>
-                      <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea", whiteSpace: "nowrap",}}># PAX</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Status</th>
                       <th style={{ textAlign: "right", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Amount</th>
                       <th style={{ textAlign: "right", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Action</th>
@@ -728,16 +722,6 @@ const itineraryTotal = itinerary
                           <div style={{ fontWeight: 700 }}>{item.name}</div>
                           <div style={{ fontSize: 12, opacity: 0.85 }}>{item.entryType}</div>
                         </td>
-                        <td
-                          style={{
-                            padding: 10,
-                            borderBottom: "1px solid #f0f2f4",
-                            textAlign: "left",
-                            fontWeight: 600,
-                          }}
-                        >
-                        {item.passengerCount}
-                        </td>
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4", fontWeight: 700 }}>
                           {item.kind === "available" ? "AVAILABLE" : "WAITLIST"}
                         </td>
@@ -752,7 +736,7 @@ const itineraryTotal = itinerary
                             fontWeight: item.kind === "available" ? 700 : 500,
                           }}
                         >
-                          {item.kind === "available" ? `$${(45 * item.passengerCount).toFixed(2)}` : "WAITLIST"}
+                          {item.kind === "available" ? "$45.00" : "WAITLIST"}
                         </td>
 
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4", textAlign: "right" }}>

@@ -709,7 +709,6 @@ const itineraryTotal = itinerary
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Date</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Time</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Activity</th>
-                      <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea", whiteSpace: "nowrap",}}># PAX</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Status</th>
                       <th style={{ textAlign: "right", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Amount</th>
                       <th style={{ textAlign: "right", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Action</th>
@@ -727,16 +726,6 @@ const itineraryTotal = itinerary
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>
                           <div style={{ fontWeight: 700 }}>{item.name}</div>
                           <div style={{ fontSize: 12, opacity: 0.85 }}>{item.entryType}</div>
-                        </td>
-                        <td
-                          style={{
-                            padding: 10,
-                            borderBottom: "1px solid #f0f2f4",
-                            textAlign: "left",
-                            fontWeight: 600,
-                          }}
-                        >
-                        {item.passengerCount}
                         </td>
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4", fontWeight: 700 }}>
                           {item.kind === "available" ? "AVAILABLE" : "WAITLIST"}
