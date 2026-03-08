@@ -611,7 +611,8 @@ const itineraryTotal = itinerary
                     onChange={(e) => setDiverCount(Number(e.target.value))}
                     style={{
                       marginTop: 4,
-                      padding: "6px 8px",
+                      padding: "7px 8px",
+                      height: 30,
                       borderRadius: 8,
                       border: "1px solid #cfd6dd",
                       background: "#ffffff",
