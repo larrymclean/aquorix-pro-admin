@@ -621,7 +621,6 @@ const itineraryTotal = itinerary
 
   if (!pendingBookingRequest) {
     console.error("[AQUORIX] Checkout payload missing.")
-    window.alert("Checkout payload missing.")
     return
   }
 
@@ -636,14 +635,9 @@ const itineraryTotal = itinerary
 
     const data = await response.json()
 
-    if (!response.ok || !data.ok) {
-      console.error("[AQUORIX] Backend booking error", data)
-      window.alert(data && data.error ? data.error : "Booking POST failed.")
-      return
-    }
-
     console.log("[AQUORIX] Backend response", data)
-    window.alert(`Pending booking created: ${data.bookingId}`)
+
+    window.alert("Backend booking stub reached. Check console.")
   } catch (error) {
     console.error("[AQUORIX] Booking POST failed", error)
     window.alert("Booking POST failed. See console.")
