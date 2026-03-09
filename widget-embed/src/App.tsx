@@ -464,7 +464,7 @@ export default function App({ destinationTimeZone }: AppProps) {
 
     const payload: ItineraryPayload = {
       schemaVersion: "1.0",
-      operatorSlug: "demo-operator",
+      operatorSlug: "blue-current-divers",
       operatorDisplayName: "Blue Current Divers",
       timezone: destinationTimeZone,
       currency: payloadCurrency,
