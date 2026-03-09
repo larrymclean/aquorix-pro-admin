@@ -4,18 +4,16 @@
   Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/src/App.tsx
 
   Description:
-  Phase 9 embeddable scheduler widget and preview checkout experience.
-  Renders a destination-local dive schedule from legacy JSON, allows
-  itinerary building, maintains available vs waitlist separation,
-  prepares encoded payload handoff to checkout, renders a preview-mode
-  checkout screen from aqx_payload, captures customer details, and
-  assembles a pre-payment booking package for backend handoff.
+  Phase 9 embeddable scheduler widget. Renders a destination-local dive
+  schedule from legacy JSON, allows itinerary building, maintains
+  available vs waitlist separation, and prepares encoded payload handoff
+  to checkout.
 
   Author: ChatGPT (Lead Systems Architect) + Larry McLean
   Created: 2026-03-05
-  Version: 1.4.0
+  Version: 1.3.0
 
-  Last Updated: 2026-03-09
+  Last Updated: 2026-03-08
   Status: ACTIVE
 
   Intellectual Property Notice:
@@ -25,25 +23,25 @@
 
   Change Log (append-only):
 
-    - 2026-03-05 - v1.0.0
+    - 2026-03-05 — v1.0.0
       Initial widget shell:
       - Fetch legacy schedule JSON
       - Render raw preview for parity plumbing verification
 
-    - 2026-03-05 - v1.0.1
+    - 2026-03-05 — v1.0.1
       - Fix TypeScript build error by tightening schedule typing
 
-    - 2026-03-05 - v1.0.2
+    - 2026-03-05 — v1.0.2
       - Add JSON length + scroll hint to remove truncated preview ambiguity
 
-    - 2026-03-06 - v1.1.0
+    - 2026-03-06 — v1.1.0
       Initial interactive widget UI:
       - Schedule grid rendering
       - Itinerary add/remove
       - Available vs waitlist separation
       - Commit redirect seam with encoded payload
 
-    - 2026-03-07 - v1.2.0
+    - 2026-03-07 — v1.2.0
       Schedule navigation and chronology improvements:
       - Destination-local rolling seven-day schedule view
       - Calendar-week navigation
@@ -55,36 +53,18 @@
       - Rebuilt dive-day numbering logic
       - Improved itinerary accounting and waitlist UI
 
-    - 2026-03-07 - v1.2.1
+    - 2026-03-07 — v1.2.1
       Data safety improvements:
       - Harden localStorage itinerary restoration
       - Runtime validation of saved itinerary items
       - Prevent stale pre-isoDate entries corrupting chronology
 
-    - 2026-03-08 - v1.3.0
+    - 2026-03-08 — v1.3.0
       Navigation and header UX refinement:
       - Removed month navigation controls
       - Simplified to Previous Week / Next Week navigation
       - Cleaned orphaned month logic and helper functions
       - Improved header layout and trip summary placement
-
-    - 2026-03-08 - v1.3.1
-      Checkout preview routing and payload schema:
-      - Added preview-mode checkout rendering inside App.tsx
-      - Added aqx_payload decode helper and checkout route detection
-      - Expanded widget handoff payload to schema v1
-      - Added operator display, timezone, currency, chargeable item,
-        waitlist item, discount, subtotal, and total payload fields
-      - Corrected Book Now redirect to embed.html preview shell
-
-    - 2026-03-09 - v1.4.0
-      Checkout customer capture milestone:
-      - Added Customer Details card to checkout preview
-      - Added customer fields for first name, last name, email,
-        phone, country, and special notes
-      - Added Continue to Payment action for pre-payment testing
-      - Added checkout submission package assembly and console logging
-      - Verified end-to-end browser-side booking package structure
 */
 
 import { useEffect, useMemo, useState } from "react"
@@ -598,12 +578,14 @@ const itineraryTotal = itinerary
       return map
     }, [sortedItinerary])
 
-    function buildPendingBookingRequest() {
-      if (!checkoutPayload) return null
+        function handleCheckoutContinue() {
+      if (!checkoutPayload) {
+        console.error("[AQUORIX] Checkout payload missing.")
+        return
+      }
 
-      return {
+      const checkoutSubmission = {
         submittedAtIso: new Date().toISOString(),
-        bookingSource: "widget-embed",
         customer: {
           firstName: customerFirstName.trim(),
           lastName: customerLastName.trim(),
@@ -614,18 +596,9 @@ const itineraryTotal = itinerary
         },
         booking: checkoutPayload,
       }
-    }
 
-    function handleCheckoutContinue() {
-      const pendingBookingRequest = buildPendingBookingRequest()
-
-      if (!pendingBookingRequest) {
-        console.error("[AQUORIX] Checkout payload missing.")
-        return
-      }
-
-      console.log("[AQUORIX] Pending booking request", pendingBookingRequest)
-      window.alert("Pending booking request logged to browser console.")
+      console.log("[AQUORIX] Checkout submission package", checkoutSubmission)
+      window.alert("Checkout package logged to browser console.")
     }
 
     if (isCheckoutRoute) {

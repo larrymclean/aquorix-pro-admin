@@ -2,39 +2,26 @@
   Product: AQUORIX
   File: embed.html
   Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/public/embed.html
-  Description: Plain HTML host page for testing the embeddable Phase 9 scheduler widget bundle and preview checkout flow. Loads the widget IIFE bundle, mounts into #aqx-widget, and serves as the deterministic preview shell for embed.html?view=checkout&aqx_payload=...
+  Description: Plain HTML host page for testing the embeddable Phase 9 scheduler widget bundle (IIFE + mount()).
 
   Author: ChatGPT (Lead) + Larry McLean
   Created: 2026-03-05
-  Version: 1.0.5
+  Version: 1.0.4
 
-  Last Updated: 2026-03-09
+  Last Updated: 2026-03-07
   Status: ACTIVE
-
-  Intellectual Property Notice:
-  This file is part of the proprietary AQUORIX platform.
-  All code, comments, and structural documentation are protected IP.
-  Header documentation must remain append-only. Never overwrite history.
 
   Change Log (append-only):
     - 2026-03-05 - v1.0.0:
       - Initial embed host page that loads the widget IIFE bundle and mounts into #aqx-widget.
-    - 2026-03-05 - v1.0.1:
-      - Fix widget global name mismatch (AquorixSchedulerWidget).
-      - Add host-page diagnostics to surface mount errors in-page.
-    - 2026-03-06 - v1.0.2:
-      - Fix widget global name mismatch (AquorixSchedulerWidget).
-      - Add host-page diagnostics to surface mount errors in-page.
+    - 2026-03-05 - v1.0.1: - Fix widget global name mismatch (AquorixSchedulerWidget). - Add host-page diagnostics to surface mount errors in-page.
+    - 2026-03-06 - v1.0.2: - Fix widget global name mismatch (AquorixSchedulerWidget). - Add host-page diagnostics to surface mount errors in-page.
     - 2026-03-06 - v1.0.3:
       - Remove host-level global stylesheet link to prevent layout corruption.
       - Add cache-busting query string to widget bundle script to avoid stale loads.
     - 2026-03-07 - v1.0.4:
       - Update demo mount call to pass destinationTimeZone into widget configuration.
       - Align embed test page with destination-local navigation contract.
-    - 2026-03-09 - v1.0.5:
-      - Confirm embed.html as canonical preview shell for checkout rendering.
-      - Support preview URL pattern using view=checkout and aqx_payload query params.
-      - Remove outer host border styling to eliminate double-border presentation.
 -->
 <!doctype html>
 <html>
