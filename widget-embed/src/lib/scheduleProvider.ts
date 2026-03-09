@@ -2,13 +2,13 @@
   Product: AQUORIX
   File: scheduleProvider.ts
   Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/src/lib/scheduleProvider.ts
-  Description: Schedule data provider for Phase 9 widget parity mode. Fetches legacy schedule JSON via dev proxy.
+  Description: Schedule data provider for Phase 9 widget. Temporarily adapts canonical sessions API into the existing parity grid shape.
 
   Author: ChatGPT (Lead) + Larry McLean
   Created: 2026-03-05
-  Version: 1.0.1
+  Version: 1.2.0
 
-  Last Updated: 2026-03-05
+  Last Updated: 2026-03-09
   Status: ACTIVE
 
   Change Log (append-only):
@@ -17,12 +17,21 @@
     - 2026-03-05 - v1.0.1:
       - Define legacy schedule JSON TypeScript types for grid rendering.
       - Remove unknown typing to prevent ReactNode/type errors.
+    - 2026-03-09 - v1.1.0:
+      - Switch data source from legacy fixture to canonical sessions API.
+      - Add temporary adapter layer to preserve existing widget grid rendering.
+      - Restrict to priced sessions only to prevent null-price sample rows from entering checkout flow.
+    - 2026-03-09 - v1.2.0:
+      - Carry canonical operator metadata through ScheduleJson so checkout payload can stop using synthetic operator values.
 */
 
 export type LegacyScheduleCell = {
   name: string
   entryType: string
   spaceAvail: number
+  sessionId?: string
+  unitPriceMinor?: number | null
+  currency?: string | null
 }
 
 export type LegacyScheduleRow = {
@@ -33,11 +42,138 @@ export type LegacyScheduleRow = {
 export type ScheduleJson = {
   status: string
   message?: string
+  operator: {
+    slug: string
+    name: string
+    timezone: string
+    currency: string | null
+    operatorDefaultCapacity: number | null
+  }
+  week: {
+    start: string
+    end: string
+  }
   schedule: LegacyScheduleRow[]
 }
 
+type CanonicalSession = {
+  session_id: string
+  session_date: string
+  day_of_week: number
+  start_time: string
+  meet_time: string | null
+  site_name: string
+  session_type: string | null
+  session_currency: string | null
+  price_per_diver: string | null
+  unit_price_minor: number | null
+  capacity_total: number | null
+  capacity_remaining: number | null
+}
+
+type CanonicalSessionsResponse = {
+  ok: boolean
+  status: string
+  operator: {
+    slug: string
+    name: string
+    timezone: string
+    currency: string | null
+    operator_default_capacity: number | null
+  }
+  week: {
+    start: string
+    end: string
+  }
+  sessions: CanonicalSession[]
+}
+
+const DAY_NAME_BY_ISODOW: Record<number, string> = {
+  1: "Monday",
+  2: "Tuesday",
+  3: "Wednesday",
+  4: "Thursday",
+  5: "Friday",
+  6: "Saturday",
+  7: "Sunday",
+}
+
+function toEntryType(sessionType: string | null): string {
+  if (!sessionType) return "Dive"
+  if (sessionType === "shore") return "Shore Dive"
+  if (sessionType === "boat") return "Boat Dive"
+  if (sessionType === "boat_charter") return "Boat Charter"
+  return sessionType
+}
+
 export async function fetchLegacySchedule(): Promise<ScheduleJson> {
-  const res = await fetch("/legacy-schedule", { method: "GET" })
-  if (!res.ok) throw new Error(`legacy schedule fetch failed: HTTP ${res.status} ${res.statusText}`)
-  return res.json()
+  const res = await fetch(
+    "http://localhost:3001/api/v1/sessions?operator_slug=blue-current-divers&week_start=2026-02-09",
+    { method: "GET" }
+  )
+
+  if (!res.ok) {
+    throw new Error(`canonical sessions fetch failed: HTTP ${res.status} ${res.statusText}`)
+  }
+
+  const json = (await res.json()) as CanonicalSessionsResponse
+
+  if (!json.ok || !Array.isArray(json.sessions)) {
+    throw new Error("canonical sessions response invalid")
+  }
+
+  const pricedSessions = json.sessions.filter((session) => {
+    return session.unit_price_minor !== null && session.unit_price_minor !== undefined
+  })
+
+  const rowMap = new Map<string, LegacyScheduleRow>()
+
+  pricedSessions.forEach((session) => {
+    const dayName = DAY_NAME_BY_ISODOW[Number(session.day_of_week)]
+    if (!dayName) return
+
+    const existingRow = rowMap.get(session.start_time)
+
+    const cell: LegacyScheduleCell = {
+      name: session.site_name,
+      entryType: toEntryType(session.session_type),
+      spaceAvail: session.capacity_remaining === null ? 0 : Number(session.capacity_remaining),
+      sessionId: session.session_id,
+      unitPriceMinor: session.unit_price_minor,
+      currency: session.session_currency,
+    }
+
+    if (!existingRow) {
+      rowMap.set(session.start_time, {
+        time: session.start_time,
+        days: {
+          [dayName]: cell,
+        },
+      })
+      return
+    }
+
+    if (!existingRow.days[dayName]) {
+      existingRow.days[dayName] = cell
+    }
+  })
+
+  const schedule = Array.from(rowMap.values()).sort((a, b) => a.time.localeCompare(b.time))
+
+  return {
+    status: "success",
+    message: "Canonical sessions adapted for parity widget",
+    operator: {
+      slug: json.operator.slug,
+      name: json.operator.name,
+      timezone: json.operator.timezone,
+      currency: json.operator.currency,
+      operatorDefaultCapacity: json.operator.operator_default_capacity,
+    },
+    week: {
+      start: json.week.start,
+      end: json.week.end,
+    },
+    schedule,
+  }
 }

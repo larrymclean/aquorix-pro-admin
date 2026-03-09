@@ -409,8 +409,11 @@ export default function App({ destinationTimeZone }: AppProps) {
       if (prev.some((x) => x.id === id)) return prev
       return [
         ...prev,
-        {
+                {
           id,
+          sessionId: cell.sessionId || id,
+          unitPriceMinor: cell.unitPriceMinor || 4500,
+          currency: cell.currency || "USD",
           kind,
           day,
           isoDate,
@@ -450,6 +453,7 @@ export default function App({ destinationTimeZone }: AppProps) {
       createdAtIso: new Date().toISOString(),
       chargeableItems: available.map((x) => ({
         itemId: x.id,
+        sessionId: x.sessionId,
         sessionKey: `${x.isoDate}__${x.time}__${x.name}`.replace(/\s+/g, "_").toLowerCase(),
         soldItemLabel: `${x.isoDate} ${x.time} ${x.name} (${x.entryType})`,
         day: x.day,
@@ -459,12 +463,13 @@ export default function App({ destinationTimeZone }: AppProps) {
         name: x.name,
         entryType: x.entryType,
         pax: x.passengerCount,
-        unitPriceMinor: 4500,
-        lineTotalMinor: 4500 * x.passengerCount,
+        unitPriceMinor: x.unitPriceMinor,
+        lineTotalMinor: x.unitPriceMinor * x.passengerCount,
         status: "AVAILABLE",
       })),
       waitlistItems: waitlist.map((x) => ({
         itemId: x.id,
+        sessionId: x.sessionId,
         sessionKey: `${x.isoDate}__${x.time}__${x.name}`.replace(/\s+/g, "_").toLowerCase(),
         soldItemLabel: `${x.isoDate} ${x.time} ${x.name} (${x.entryType})`,
         day: x.day,

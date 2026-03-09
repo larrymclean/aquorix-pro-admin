@@ -6,9 +6,9 @@
 
   Author: ChatGPT (Lead) + Larry McLean
   Created: 2026-03-06
-  Version: 1.1.0
+  Version: 1.2.0
 
-  Last Updated: 2026-03-08
+  Last Updated: 2026-03-09
   Status: ACTIVE
 
   Change Log (append-only):
@@ -19,10 +19,17 @@
       - Add operator facing sold item label fields.
       - Add currency timezone totals and discount fields.
       - Keep waitlist items informational only and separate from chargeable items.
+    - 2026-03-09 - v1.2.0:
+      - Add canonical session identity and pricing fields to itinerary items.
+      - Add sessionId to checkout payload item contracts.
+      - Preserve sessionKey as a secondary display/debug field only.
 */
 
 export type ItineraryItemBase = {
   id: string
+  sessionId: string
+  unitPriceMinor: number
+  currency: string
   day: string
   isoDate: string
   dateLabel: string
@@ -44,6 +51,7 @@ export type ItineraryItem = ItineraryAvailableItem | ItineraryWaitlistItem
 
 export type CheckoutChargeableItem = {
   itemId: string
+  sessionId: string
   sessionKey: string
   soldItemLabel: string
   day: string
@@ -60,6 +68,7 @@ export type CheckoutChargeableItem = {
 
 export type CheckoutWaitlistItem = {
   itemId: string
+  sessionId: string
   sessionKey: string
   soldItemLabel: string
   day: string
