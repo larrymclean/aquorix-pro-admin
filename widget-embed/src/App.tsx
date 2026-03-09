@@ -217,11 +217,22 @@ function safeSaveItinerary(items: ItineraryItem[]) {
   }
 }
 
+function getCurrencyMinorUnitDivisor(currency: string): number {
+  const upper = String(currency || "").trim().toUpperCase()
+
+  switch (upper) {
+    case "JOD":
+      return 1000
+    default:
+      return 100
+  }
+}
+
 function formatMinorCurrency(amountMinor: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
-  }).format(amountMinor / 100)
+  }).format(amountMinor / getCurrencyMinorUnitDivisor(currency))
 }
 
 function decodeCheckoutPayloadFromUrl(): ItineraryPayload | null {
@@ -439,17 +450,24 @@ export default function App({ destinationTimeZone }: AppProps) {
     const available = itinerary.filter((x) => x.kind === "available")
     const waitlist = itinerary.filter((x) => x.kind === "waitlist")
 
-    const subtotalMinor = Math.round(itineraryTotal * 100)
-    const promoDiscountMinor = Math.round(promoDiscount * 100)
-    const greenFinsDiscountMinor = Math.round(greenFinsDiscount * 100)
-    const totalMinor = Math.round(finalTotal * 100)
+    const payloadCurrency =
+      available[0]?.currency ||
+      waitlist[0]?.currency ||
+      "JOD"
+
+    const payloadMinorUnitDivisor = getCurrencyMinorUnitDivisor(payloadCurrency)
+
+    const subtotalMinor = Math.round(itineraryTotal * payloadMinorUnitDivisor)
+    const promoDiscountMinor = Math.round(promoDiscount * payloadMinorUnitDivisor)
+    const greenFinsDiscountMinor = Math.round(greenFinsDiscount * payloadMinorUnitDivisor)
+    const totalMinor = Math.round(finalTotal * payloadMinorUnitDivisor)
 
     const payload: ItineraryPayload = {
       schemaVersion: "1.0",
       operatorSlug: "demo-operator",
       operatorDisplayName: "Blue Current Divers",
       timezone: destinationTimeZone,
-      currency: "USD",
+      currency: payloadCurrency,
       createdAtIso: new Date().toISOString(),
       chargeableItems: available.map((x) => ({
         itemId: x.id,
@@ -507,9 +525,16 @@ const availablePassengerCount = itinerary
   .filter((x) => x.kind === "available")
   .reduce((sum, x) => sum + x.passengerCount, 0)
 
+const itineraryCurrency =
+  itinerary.find((x) => x.kind === "available")?.currency ||
+  itinerary[0]?.currency ||
+  "JOD"
+
+const itineraryMinorUnitDivisor = getCurrencyMinorUnitDivisor(itineraryCurrency)
+
 const itineraryTotal = itinerary
   .filter((x) => x.kind === "available")
-  .reduce((sum, x) => sum + (45 * x.passengerCount), 0)
+  .reduce((sum, x) => sum + ((x.unitPriceMinor / itineraryMinorUnitDivisor) * x.passengerCount), 0)
 
   const [promoCodeInput, setPromoCodeInput] = useState("")
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null)
