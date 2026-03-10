@@ -6,7 +6,7 @@
 
   Author: ChatGPT (Lead) + Larry McLean
   Created: 2026-03-05
-  Version: 1.2.0
+  Version: 1.1.0
 
   Last Updated: 2026-03-09
   Status: ACTIVE
@@ -21,8 +21,6 @@
       - Switch data source from legacy fixture to canonical sessions API.
       - Add temporary adapter layer to preserve existing widget grid rendering.
       - Restrict to priced sessions only to prevent null-price sample rows from entering checkout flow.
-    - 2026-03-09 - v1.2.0:
-      - Carry canonical operator metadata through ScheduleJson so checkout payload can stop using synthetic operator values.
 */
 
 export type LegacyScheduleCell = {
@@ -42,17 +40,6 @@ export type LegacyScheduleRow = {
 export type ScheduleJson = {
   status: string
   message?: string
-  operator: {
-    slug: string
-    name: string
-    timezone: string
-    currency: string | null
-    operatorDefaultCapacity: number | null
-  }
-  week: {
-    start: string
-    end: string
-  }
   schedule: LegacyScheduleRow[]
 }
 
@@ -108,7 +95,7 @@ function toEntryType(sessionType: string | null): string {
 
 export async function fetchLegacySchedule(): Promise<ScheduleJson> {
   const res = await fetch(
-    "http://localhost:3001/api/v1/sessions?operator_slug=blue-current-divers",
+    "http://localhost:3001/api/v1/sessions?operator_slug=blue-current-divers&week_start=2026-02-09",
     { method: "GET" }
   )
 
@@ -163,17 +150,6 @@ export async function fetchLegacySchedule(): Promise<ScheduleJson> {
   return {
     status: "success",
     message: "Canonical sessions adapted for parity widget",
-    operator: {
-      slug: json.operator.slug,
-      name: json.operator.name,
-      timezone: json.operator.timezone,
-      currency: json.operator.currency,
-      operatorDefaultCapacity: json.operator.operator_default_capacity,
-    },
-    week: {
-      start: json.week.start,
-      end: json.week.end,
-    },
     schedule,
   }
 }

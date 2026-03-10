@@ -464,7 +464,7 @@ export default function App({ destinationTimeZone }: AppProps) {
 
     const payload: ItineraryPayload = {
       schemaVersion: "1.0",
-      operatorSlug: "blue-current-divers",
+      operatorSlug: "demo-operator",
       operatorDisplayName: "Blue Current Divers",
       timezone: destinationTimeZone,
       currency: payloadCurrency,
@@ -672,40 +672,8 @@ const itineraryTotal = itinerary
       return
     }
 
-    console.log("[AQUORIX] Pending booking created", data)
-
-const bookingId = data.bookingId
-
-if (!bookingId) {
-  console.error("[AQUORIX] bookingId missing from backend response")
-  window.alert("Booking created but bookingId missing.")
-  return
-}
-
-const checkoutResponse = await fetch(
-  `http://localhost:3001/api/v1/widget/bookings/${bookingId}/checkout-session`,
-  {
-    method: "POST",
-  }
-)
-
-const checkoutData = await checkoutResponse.json()
-
-if (!checkoutResponse.ok || !checkoutData.ok) {
-  console.error("[AQUORIX] Checkout session creation failed", checkoutData)
-  window.alert("Checkout session creation failed.")
-  return
-}
-
-const checkoutUrl = checkoutData.checkoutUrl
-
-if (!checkoutUrl) {
-  console.error("[AQUORIX] checkoutUrl missing", checkoutData)
-  window.alert("Checkout URL missing.")
-  return
-}
-
-window.location.href = checkoutUrl
+    console.log("[AQUORIX] Backend response", data)
+    window.alert(`Pending booking created: ${data.bookingId}`)
   } catch (error) {
     console.error("[AQUORIX] Booking POST failed", error)
     window.alert("Booking POST failed. See console.")
