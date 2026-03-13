@@ -271,28 +271,28 @@ type CheckoutSessionQuote = {
 }
 
 export default function App({ destinationTimeZone }: AppProps) {
-  const [data, setData] = useState<ScheduleJson | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [itinerary, setItinerary] = useState<ItineraryItem[]>(() => safeLoadItinerary())
+    const [data, setData] = useState<ScheduleJson | null>(null)
+    const [error, setError] = useState<string | null>(null)
+    const [itinerary, setItinerary] = useState<ItineraryItem[]>(() => safeLoadItinerary())
 
-  const [minDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), destinationTimeZone))
-  const [viewMode, setViewMode] = useState<ViewMode>("rolling_today")
-  const [anchorDate, setAnchorDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), destinationTimeZone))
+    const [minDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), destinationTimeZone))
+    const [viewMode, setViewMode] = useState<ViewMode>("rolling_today")
+    const [anchorDate, setAnchorDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), destinationTimeZone))
 
-  const [arrivalDate, setArrivalDate] = useState<string>(minDate)
-  const [departureDate, setDepartureDate] = useState<string>(() => addDaysToIso(minDate, 6))
-  const [diverCount, setDiverCount] = useState<number>(1)
+    const [arrivalDate, setArrivalDate] = useState<string>(minDate)
+    const [departureDate, setDepartureDate] = useState<string>(() => addDaysToIso(minDate, 6))
+    const [diverCount, setDiverCount] = useState<number>(1)
 
-  const isCheckoutRoute = useMemo(() => {
-    if (typeof window === "undefined") return false
-    const params = new URLSearchParams(window.location.search)
-    return params.get("view") === "checkout"
-  }, [])
+    const isCheckoutRoute = useMemo(() => {
+      if (typeof window === "undefined") return false
+      const params = new URLSearchParams(window.location.search)
+      return params.get("view") === "checkout"
+    }, [])
 
-  const checkoutPayload = useMemo(() => {
-    if (!isCheckoutRoute) return null
-    return decodeCheckoutPayloadFromUrl()
-  }, [isCheckoutRoute])
+    const checkoutPayload = useMemo(() => {
+      if (!isCheckoutRoute) return null
+      return decodeCheckoutPayloadFromUrl()
+    }, [isCheckoutRoute])
 
     const [customerFirstName, setCustomerFirstName] = useState("")
     const [customerLastName, setCustomerLastName] = useState("")
@@ -303,66 +303,66 @@ export default function App({ destinationTimeZone }: AppProps) {
     const [checkoutSessionQuote, setCheckoutSessionQuote] = useState<CheckoutSessionQuote | null>(null)
     const [isPreparingStripeCheckout, setIsPreparingStripeCheckout] = useState(false)
 
-  useEffect(() => {
-    const safeArrival = arrivalDate < minDate ? minDate : arrivalDate
+    useEffect(() => {
+      const safeArrival = arrivalDate < minDate ? minDate : arrivalDate
 
-    if (arrivalDate !== safeArrival) {
-      setArrivalDate(safeArrival)
-      return
-    }
+      if (arrivalDate !== safeArrival) {
+        setArrivalDate(safeArrival)
+        return
+      }
 
-    setViewMode("rolling_today")
-    setAnchorDate(safeArrival)
-  }, [arrivalDate, minDate])
-
-  useEffect(() => {
-    if (departureDate < arrivalDate) {
-      setDepartureDate(arrivalDate)
-    }
-  }, [arrivalDate, departureDate])
-
-  const visibleDates = useMemo(() => {
-    return viewMode === "rolling_today"
-      ? getRollingWindowDates(anchorDate)
-      : getCalendarWeekDates(anchorDate)
-  }, [viewMode, anchorDate])
-
-  function handleNextWeek() {
-    const nextAnchorDate =
-      viewMode === "rolling_today"
-        ? getMondayOnOrAfterIso(anchorDate)
-        : addDaysToIso(anchorDate, 7)
-
-    setViewMode("calendar_week")
-    setAnchorDate(nextAnchorDate)
-  }
-
-  function handlePreviousWeek() {
-    const previousAnchorDate =
-      viewMode === "rolling_today"
-        ? addDaysToIso(anchorDate, -7)
-        : addDaysToIso(anchorDate, -7)
-
-    if (previousAnchorDate <= minDate) {
       setViewMode("rolling_today")
-      setAnchorDate(minDate)
-      return
+      setAnchorDate(safeArrival)
+    }, [arrivalDate, minDate])
+
+    useEffect(() => {
+      if (departureDate < arrivalDate) {
+        setDepartureDate(arrivalDate)
+      }
+    }, [arrivalDate, departureDate])
+
+    const visibleDates = useMemo(() => {
+      return viewMode === "rolling_today"
+        ? getRollingWindowDates(anchorDate)
+        : getCalendarWeekDates(anchorDate)
+    }, [viewMode, anchorDate])
+
+      function handleNextWeek() {
+        const nextAnchorDate =
+          viewMode === "rolling_today"
+            ? getMondayOnOrAfterIso(anchorDate)
+            : addDaysToIso(anchorDate, 7)
+
+        setViewMode("calendar_week")
+        setAnchorDate(nextAnchorDate)
+      }
+
+    function handlePreviousWeek() {
+      const previousAnchorDate =
+        viewMode === "rolling_today"
+          ? addDaysToIso(anchorDate, -7)
+          : addDaysToIso(anchorDate, -7)
+
+      if (previousAnchorDate <= minDate) {
+        setViewMode("rolling_today")
+        setAnchorDate(minDate)
+        return
+      }
+
+      setViewMode("calendar_week")
+      setAnchorDate(previousAnchorDate)
     }
 
-    setViewMode("calendar_week")
-    setAnchorDate(previousAnchorDate)
-  }
+    const visibleDateHeaders = useMemo(() => {
+      return visibleDates.map((isoDate) => ({
+        isoDate,
+        weekday: getWeekdayNameFromIso(isoDate),
+        headerLabel: formatHeaderLabelFromIso(isoDate),
+        dateLabel: formatDateLabelFromIso(isoDate),
+      }))
+    }, [visibleDates])
 
-  const visibleDateHeaders = useMemo(() => {
-    return visibleDates.map((isoDate) => ({
-      isoDate,
-      weekday: getWeekdayNameFromIso(isoDate),
-      headerLabel: formatHeaderLabelFromIso(isoDate),
-      dateLabel: formatDateLabelFromIso(isoDate),
-    }))
-  }, [visibleDates])
-
-  const scheduleRangeLabel = useMemo(() => {
+    const scheduleRangeLabel = useMemo(() => {
     if (!visibleDates.length) return ""
 
     const startIso = visibleDates[0]
@@ -385,22 +385,22 @@ export default function App({ destinationTimeZone }: AppProps) {
   }, [visibleDates])
 
   const selectedTripLabel = useMemo(() => {
-    const start = new Intl.DateTimeFormat("en-US", {
-      timeZone: "UTC",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(getDateFromIso(arrivalDate))
+  const start = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(getDateFromIso(arrivalDate))
 
-    const end = new Intl.DateTimeFormat("en-US", {
-      timeZone: "UTC",
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(getDateFromIso(departureDate))
+  const end = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(getDateFromIso(departureDate))
 
-    return `${start} – ${end}`
-  }, [arrivalDate, departureDate])
+  return `${start} – ${end}`
+}, [arrivalDate, departureDate])
 
   useEffect(() => {
     safeSaveItinerary(itinerary)
@@ -423,7 +423,7 @@ export default function App({ destinationTimeZone }: AppProps) {
     return () => {
       mounted = false
     }
-  }, [isCheckoutRoute, anchorDate])
+    }, [isCheckoutRoute, anchorDate])
 
   const scheduleRows: LegacyScheduleRow[] = useMemo(() => {
     return data?.schedule || []
@@ -440,7 +440,7 @@ export default function App({ destinationTimeZone }: AppProps) {
       if (prev.some((x) => x.id === id)) return prev
       return [
         ...prev,
-        {
+                {
           id,
           sessionId: cell.sessionId || id,
           unitPriceMinor: cell.unitPriceMinor || 4500,
@@ -466,7 +466,7 @@ export default function App({ destinationTimeZone }: AppProps) {
     setItinerary([])
   }
 
-  function commitItinerary() {
+    function commitItinerary() {
     const available = itinerary.filter((x) => x.kind === "available")
     const waitlist = itinerary.filter((x) => x.kind === "waitlist")
 
@@ -538,23 +538,23 @@ export default function App({ destinationTimeZone }: AppProps) {
     window.location.assign(`/embed.html?view=checkout&aqx_payload=${encoded}`)
   }
 
-  const availableCount = itinerary.filter((x) => x.kind === "available").length
-  const waitlistCount = itinerary.filter((x) => x.kind === "waitlist").length
+const availableCount = itinerary.filter((x) => x.kind === "available").length
+const waitlistCount = itinerary.filter((x) => x.kind === "waitlist").length
 
-  const availablePassengerCount = itinerary
-    .filter((x) => x.kind === "available")
-    .reduce((sum, x) => sum + x.passengerCount, 0)
+const availablePassengerCount = itinerary
+  .filter((x) => x.kind === "available")
+  .reduce((sum, x) => sum + x.passengerCount, 0)
 
-  const itineraryCurrency =
-    itinerary.find((x) => x.kind === "available")?.currency ||
-    itinerary[0]?.currency ||
-    "JOD"
+const itineraryCurrency =
+  itinerary.find((x) => x.kind === "available")?.currency ||
+  itinerary[0]?.currency ||
+  "JOD"
 
-  const itineraryMinorUnitDivisor = getCurrencyMinorUnitDivisor(itineraryCurrency)
+const itineraryMinorUnitDivisor = getCurrencyMinorUnitDivisor(itineraryCurrency)
 
-  const itineraryTotal = itinerary
-    .filter((x) => x.kind === "available")
-    .reduce((sum, x) => sum + ((x.unitPriceMinor / itineraryMinorUnitDivisor) * x.passengerCount), 0)
+const itineraryTotal = itinerary
+  .filter((x) => x.kind === "available")
+  .reduce((sum, x) => sum + ((x.unitPriceMinor / itineraryMinorUnitDivisor) * x.passengerCount), 0)
 
   const [promoCodeInput, setPromoCodeInput] = useState("")
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null)
@@ -637,127 +637,102 @@ export default function App({ destinationTimeZone }: AppProps) {
   }, [itinerary])
 
   // Dive Day numbering (divers think in dive days, not weekdays)
-  const diveDayMap = useMemo(() => {
-    const uniqueDates = Array.from(new Set(sortedItinerary.map((x) => x.isoDate)))
-    const map: Record<string, number> = {}
+    const diveDayMap = useMemo(() => {
+      const uniqueDates = Array.from(new Set(sortedItinerary.map((x) => x.isoDate)))
+      const map: Record<string, number> = {}
 
-    uniqueDates.forEach((isoDate, i) => {
-      map[isoDate] = i + 1
+      uniqueDates.forEach((isoDate, i) => {
+        map[isoDate] = i + 1
+      })
+
+      return map
+    }, [sortedItinerary])
+
+    function buildPendingBookingRequest() {
+      if (!checkoutPayload) return null
+
+      return {
+        submittedAtIso: new Date().toISOString(),
+        bookingSource: "widget-embed",
+        customer: {
+          firstName: customerFirstName.trim(),
+          lastName: customerLastName.trim(),
+          email: customerEmail.trim(),
+          phone: customerPhone.trim(),
+          country: customerCountry.trim(),
+          notes: customerNotes.trim(),
+        },
+        booking: checkoutPayload,
+      }
+    }
+
+  async function handleCheckoutContinue() {
+  const pendingBookingRequest = buildPendingBookingRequest()
+
+  if (!pendingBookingRequest) {
+    console.error("[AQUORIX] Checkout payload missing.")
+    window.alert("Checkout payload missing.")
+    return
+  }
+
+  try {
+    const response = await fetch("http://localhost:3001/api/v1/widget/bookings/pending", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(pendingBookingRequest),
     })
 
-    return map
-  }, [sortedItinerary])
+    const data = await response.json()
 
-  function buildPendingBookingRequest() {
-    if (!checkoutPayload) return null
-
-    return {
-      submittedAtIso: new Date().toISOString(),
-      bookingSource: "widget-embed",
-      customer: {
-        firstName: customerFirstName.trim(),
-        lastName: customerLastName.trim(),
-        email: customerEmail.trim(),
-        phone: customerPhone.trim(),
-        country: customerCountry.trim(),
-        notes: customerNotes.trim(),
-      },
-      booking: checkoutPayload,
-    }
-  }
-
-    async function handleCheckoutContinue() {
-    if (checkoutSessionQuote && checkoutSessionQuote.checkoutUrl) {
-      window.location.href = checkoutSessionQuote.checkoutUrl
+    if (!response.ok || !data.ok) {
+      console.error("[AQUORIX] Backend booking error", data)
+      window.alert(data && data.error ? data.error : "Booking POST failed.")
       return
     }
 
-    const pendingBookingRequest = buildPendingBookingRequest()
+    console.log("[AQUORIX] Pending booking created", data)
 
-    if (!pendingBookingRequest) {
-      console.error("[AQUORIX] Checkout payload missing.")
-      window.alert("Checkout payload missing.")
-      return
-    }
+const bookingId = data.bookingId
 
-    setIsPreparingStripeCheckout(true)
+if (!bookingId) {
+  console.error("[AQUORIX] bookingId missing from backend response")
+  window.alert("Booking created but bookingId missing.")
+  return
+}
 
-    try {
-      const response = await fetch("http://localhost:3001/api/v1/widget/bookings/pending", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(pendingBookingRequest),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok || !data.ok) {
-        console.error("[AQUORIX] Backend booking error", data)
-        window.alert(data && data.error ? data.error : "Booking POST failed.")
-        return
-      }
-
-      console.log("[AQUORIX] Pending booking created", data)
-
-      const bookingId = data.bookingId
-
-      if (!bookingId) {
-        console.error("[AQUORIX] bookingId missing from backend response")
-        window.alert("Booking created but bookingId missing.")
-        return
-      }
-
-      const checkoutResponse = await fetch(
-        `http://localhost:3001/api/v1/widget/bookings/${bookingId}/checkout-session`,
-        {
-          method: "POST",
-        }
-      )
-
-      const checkoutData = await checkoutResponse.json()
-
-      if (!checkoutResponse.ok || !checkoutData.ok) {
-        console.error("[AQUORIX] Checkout session creation failed", checkoutData)
-        window.alert(checkoutData && checkoutData.error ? checkoutData.error : "Checkout session creation failed.")
-        return
-      }
-
-      const checkoutUrl = checkoutData.checkoutUrl
-
-      if (!checkoutUrl) {
-        console.error("[AQUORIX] checkoutUrl missing", checkoutData)
-        window.alert("Checkout URL missing.")
-        return
-      }
-
-      setCheckoutSessionQuote({
-        checkoutUrl,
-        ledger: {
-          currency: checkoutData.ledger.currency,
-          amountMinor: checkoutData.ledger.amountMinor,
-          amountDisplay: checkoutData.ledger.amountDisplay,
-        },
-        charge: {
-          currency: checkoutData.charge.currency,
-          amountMinor: checkoutData.charge.amountMinor,
-          amountDisplay: checkoutData.charge.amountDisplay,
-        },
-        fx: {
-          rate: checkoutData.fx.rate,
-          source: checkoutData.fx.source,
-        },
-      })
-    } catch (error) {
-      console.error("[AQUORIX] Booking POST failed", error)
-      window.alert("Booking POST failed. See console.")
-    } finally {
-      setIsPreparingStripeCheckout(false)
-    }
+const checkoutResponse = await fetch(
+  `http://localhost:3001/api/v1/widget/bookings/${bookingId}/checkout-session`,
+  {
+    method: "POST",
   }
+)
 
-  if (isCheckoutRoute) {
+const checkoutData = await checkoutResponse.json()
+
+if (!checkoutResponse.ok || !checkoutData.ok) {
+  console.error("[AQUORIX] Checkout session creation failed", checkoutData)
+  window.alert("Checkout session creation failed.")
+  return
+}
+
+const checkoutUrl = checkoutData.checkoutUrl
+
+if (!checkoutUrl) {
+  console.error("[AQUORIX] checkoutUrl missing", checkoutData)
+  window.alert("Checkout URL missing.")
+  return
+}
+
+window.location.href = checkoutUrl
+  } catch (error) {
+    console.error("[AQUORIX] Booking POST failed", error)
+    window.alert("Booking POST failed. See console.")
+  }
+}
+
+    if (isCheckoutRoute) {
     return (
       <div
         className="aqx-widget-shell"
@@ -788,7 +763,7 @@ export default function App({ destinationTimeZone }: AppProps) {
         )}
 
         {checkoutPayload && (
-          <div style={{ display: "grid", gap: 14 }}>
+                    <div style={{ display: "grid", gap: 14 }}>
             <div
               style={{
                 border: "1px solid #e3e6ea",
@@ -1082,7 +1057,7 @@ export default function App({ destinationTimeZone }: AppProps) {
                 background: "#ffffff",
               }}
             >
-                            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
                 Pricing Summary
               </div>
 
@@ -1119,67 +1094,22 @@ export default function App({ destinationTimeZone }: AppProps) {
                 </div>
               </div>
 
-              {checkoutSessionQuote && (
-                <div
-                  style={{
-                    marginTop: 16,
-                    padding: 12,
-                    border: "1px solid #d7dde3",
-                    borderRadius: 10,
-                    background: "#f8fafc",
-                    display: "grid",
-                    gap: 8,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                    <span>Dive Total</span>
-                    <span style={{ fontWeight: 700 }}>
-                      {checkoutSessionQuote.ledger.amountDisplay} {checkoutSessionQuote.ledger.currency}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                    <span>Card Charge</span>
-                    <span style={{ fontWeight: 800 }}>
-                      ${checkoutSessionQuote.charge.amountDisplay} {checkoutSessionQuote.charge.currency}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, color: "#5f6b76" }}>
-                    <span>Exchange Rate</span>
-                    <span>
-                      1 {checkoutSessionQuote.ledger.currency} = ${checkoutSessionQuote.fx.rate.toFixed(2)} {checkoutSessionQuote.charge.currency}
-                    </span>
-                  </div>
-
-                  <div style={{ fontSize: 12, color: "#5f6b76" }}>
-                    Your card will be charged in {checkoutSessionQuote.charge.currency} by AQUORIX. Your bank may apply additional foreign transaction fees.
-                  </div>
-                </div>
-              )}
-
               <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
                 <button
                   type="button"
                   onClick={handleCheckoutContinue}
-                  disabled={isPreparingStripeCheckout}
                   style={{
                     padding: "10px 14px",
                     borderRadius: 10,
                     border: "1px solid #075c31",
                     background: "#e6f4ec",
                     color: "#075c31",
-                    cursor: isPreparingStripeCheckout ? "not-allowed" : "pointer",
+                    cursor: "pointer",
                     fontWeight: 800,
                     whiteSpace: "nowrap",
-                    opacity: isPreparingStripeCheckout ? 0.7 : 1,
                   }}
                 >
-                  {isPreparingStripeCheckout
-                    ? "Preparing Payment..."
-                    : checkoutSessionQuote
-                      ? `Pay $${checkoutSessionQuote.charge.amountDisplay} ${checkoutSessionQuote.charge.currency} with Card`
-                      : "Review Card Charge"}
+                  Continue to Payment
                 </button>
               </div>
             </div>
@@ -1216,8 +1146,8 @@ export default function App({ destinationTimeZone }: AppProps) {
   }
 
   return (
-    <div className="aqx-widget-shell" style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" }}>
-      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+      <div className="aqx-widget-shell" style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" }}>
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
         Blue Current Divers Schedule & Itinerary Builder
       </div>
 
@@ -1381,7 +1311,7 @@ export default function App({ destinationTimeZone }: AppProps) {
                   {scheduleRows.map((row) => (
                     <tr key={row.time}>
                       <td style={{ padding: 10, borderBottom: "1px solid #f0f2f4", fontWeight: 700 }}>{row.time}</td>
-                      {visibleDateHeaders.map((col) => {
+                                            {visibleDateHeaders.map((col) => {
                         const day = col.weekday
                         const cell = row.days[day]
 
@@ -1442,7 +1372,7 @@ export default function App({ destinationTimeZone }: AppProps) {
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Date</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Time</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Activity</th>
-                      <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea", whiteSpace: "nowrap", }}># PAX</th>
+                      <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea", whiteSpace: "nowrap",}}># PAX</th>
                       <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Status</th>
                       <th style={{ textAlign: "right", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Amount</th>
                       <th style={{ textAlign: "right", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Action</th>
@@ -1469,7 +1399,7 @@ export default function App({ destinationTimeZone }: AppProps) {
                             fontWeight: 600,
                           }}
                         >
-                          {item.passengerCount}
+                        {item.passengerCount}
                         </td>
                         <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4", fontWeight: 700 }}>
                           {item.kind === "available" ? "AVAILABLE" : "WAITLIST"}
@@ -1813,7 +1743,7 @@ export default function App({ destinationTimeZone }: AppProps) {
                     : ""}
                 </div>
 
-                {greenFinsModalOpen && (
+                                {greenFinsModalOpen && (
                   <div
                     role="dialog"
                     aria-modal="true"
@@ -1931,7 +1861,7 @@ export default function App({ destinationTimeZone }: AppProps) {
                     </div>
                   </div>
                 )}
-
+                
               </div>
             )}
 
