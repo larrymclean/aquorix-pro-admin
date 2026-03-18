@@ -35,20 +35,16 @@ type ApiBooking = {
   payment_status: string;
   payment_currency: string;
   payment_amount: string;
-  payment_amount_minor?: string | null;
 
   hold_expires_at: string | null;
   paid_at: string | null;
 
   requires_manual_review_derived: boolean;
-  manual_review_required?: boolean;
   manual_review_reason: string | null;
 
   ui_status: string;
 
   headcount: number;
-  total_pax?: number | null;
-  item_count?: number | null;
 
   guest_name: string;
   guest_email: string;
@@ -61,7 +57,7 @@ type ApiBooking = {
   updated_at: string;
 
   session_id: string;
-  itinerary_id: string | null;
+  itinerary_id: string;
 
   dive_datetime_local: string;
   session_date: string;
@@ -69,15 +65,6 @@ type ApiBooking = {
   site_name: string;
 
   itinerary_title: string;
-  itinerary_date?: string | null;
-  itinerary_slot?: string | null;
-  itinerary_type?: string | null;
-  itinerary_location_type?: string | null;
-
-  first_session_at_local?: string | null;
-  last_session_at_local?: string | null;
-  sites_summary?: string | null;
-  booking_items_summary?: string | null;
 
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
@@ -331,12 +318,7 @@ export default function BookingDetailPage() {
     return {
       header: {
         title: booking.guest_name || "Guest",
-        subtitle: `${booking.booking_items_summary || "1 session booked"} • ${booking.headcount || "—"} divers`,
-        sites: booking.sites_summary || booking.site_name || "—",
-        window:
-          booking.first_session_at_local && booking.last_session_at_local
-            ? `${formatIsoForDisplay(booking.first_session_at_local)} → ${formatIsoForDisplay(booking.last_session_at_local)}`
-            : `${booking.session_date || "—"} ${booking.start_time || ""}`,
+        subtitle: `${booking.site_name || "Site"} • ${booking.session_date || "—"} • ${booking.start_time || "—"}`,
         metaRightTop: `#${booking.booking_id}`,
         metaRightBottom: (booking.source || "—").toUpperCase(),
       },
@@ -382,13 +364,6 @@ export default function BookingDetailPage() {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 18, fontWeight: 950, marginBottom: 6 }}>{sections.header.title}</div>
                 <div style={{ fontSize: 13, opacity: 0.85 }}>{sections.header.subtitle}</div>
-                <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>
-                  {sections.header.sites}
-                </div>
-
-                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
-                  {sections.header.window}
-                </div>
               </div>
 
               <div style={{ textAlign: "right", fontSize: 12, opacity: 0.85 }}>
@@ -404,35 +379,6 @@ export default function BookingDetailPage() {
               {sections.statusRow.needsReview ? <span style={pill("warn")}>NEEDS REVIEW</span> : null}
               {sections.statusRow.reviewReason ? <span style={pill("warn")}>REASON: {labelize(sections.statusRow.reviewReason)}</span> : null}
             </div>
-          </div>
-
-          {/* Booking Scope */}
-          <div style={styles.card}>
-            <div style={styles.sectionTitle}>Booking Scope</div>
-            <Row k="Sessions" v={booking.booking_items_summary || "—"} />
-            <Row k="Divers" v={String(booking.total_pax ?? booking.headcount ?? "—")} />
-            <Row
-              k="Booking Window"
-              v={
-                booking.first_session_at_local && booking.last_session_at_local
-                  ? `${formatIsoForDisplay(booking.first_session_at_local)} → ${formatIsoForDisplay(booking.last_session_at_local)}`
-                  : "—"
-              }
-            />
-            <Row k="Sites" v={booking.sites_summary || booking.site_name || "—"} />
-            <Row k="Primary Session ID" v={booking.session_id || "—"} />
-            <Row k="Primary Itinerary ID" v={booking.itinerary_id || "—"} />
-            <Row k="Primary Itinerary Title" v={booking.itinerary_title || "—"} />
-          </div>
-
-          {/* Guest */}
-          <div style={styles.card}>
-            <div style={styles.sectionTitle}>Guest</div>
-            <Row k="Name" v={booking.guest_name || "—"} />
-            <Row k="Email" v={booking.guest_email || "—"} mono />
-            <Row k="Phone" v={booking.guest_phone || "—"} mono />
-            <Row k="Headcount" v={String(booking.headcount ?? "—")} />
-            <Row k="Requests" v={booking.special_requests || "—"} />
           </div>
 
           {/* Payment */}
@@ -455,6 +401,28 @@ export default function BookingDetailPage() {
               k="FX"
               v={booking.fx_rate_estimate ? `${booking.fx_rate_estimate} (${booking.fx_rate_source || "source unknown"})` : "—"}
             />
+          </div>
+
+          {/* Guest */}
+          <div style={styles.card}>
+            <div style={styles.sectionTitle}>Guest</div>
+            <Row k="Name" v={booking.guest_name || "—"} />
+            <Row k="Email" v={booking.guest_email || "—"} mono />
+            <Row k="Phone" v={booking.guest_phone || "—"} mono />
+            <Row k="Headcount" v={String(booking.headcount ?? "—")} />
+            <Row k="Requests" v={booking.special_requests || "—"} />
+          </div>
+
+          {/* Session */}
+          <div style={styles.card}>
+            <div style={styles.sectionTitle}>Session</div>
+            <Row k="Session ID" v={booking.session_id || "—"} />
+            <Row k="Itinerary ID" v={booking.itinerary_id || "—"} />
+            <Row k="Itinerary Title" v={booking.itinerary_title || "—"} />
+            <Row k="Dive Date" v={booking.session_date || "—"} />
+            <Row k="Start Time" v={booking.start_time || "—"} />
+            <Row k="Dive Datetime" v={labelDiveDatetime(booking.dive_datetime_local)} mono />
+            <Row k="Site" v={booking.site_name || "—"} />
           </div>
 
           {/* Actions (disabled for now) */}

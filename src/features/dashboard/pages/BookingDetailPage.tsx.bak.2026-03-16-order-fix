@@ -406,35 +406,6 @@ export default function BookingDetailPage() {
             </div>
           </div>
 
-          {/* Booking Scope */}
-          <div style={styles.card}>
-            <div style={styles.sectionTitle}>Booking Scope</div>
-            <Row k="Sessions" v={booking.booking_items_summary || "—"} />
-            <Row k="Divers" v={String(booking.total_pax ?? booking.headcount ?? "—")} />
-            <Row
-              k="Booking Window"
-              v={
-                booking.first_session_at_local && booking.last_session_at_local
-                  ? `${formatIsoForDisplay(booking.first_session_at_local)} → ${formatIsoForDisplay(booking.last_session_at_local)}`
-                  : "—"
-              }
-            />
-            <Row k="Sites" v={booking.sites_summary || booking.site_name || "—"} />
-            <Row k="Primary Session ID" v={booking.session_id || "—"} />
-            <Row k="Primary Itinerary ID" v={booking.itinerary_id || "—"} />
-            <Row k="Primary Itinerary Title" v={booking.itinerary_title || "—"} />
-          </div>
-
-          {/* Guest */}
-          <div style={styles.card}>
-            <div style={styles.sectionTitle}>Guest</div>
-            <Row k="Name" v={booking.guest_name || "—"} />
-            <Row k="Email" v={booking.guest_email || "—"} mono />
-            <Row k="Phone" v={booking.guest_phone || "—"} mono />
-            <Row k="Headcount" v={String(booking.headcount ?? "—")} />
-            <Row k="Requests" v={booking.special_requests || "—"} />
-          </div>
-
           {/* Payment */}
           <div style={styles.card}>
             <div style={styles.sectionTitle}>Payment</div>
@@ -455,6 +426,35 @@ export default function BookingDetailPage() {
               k="FX"
               v={booking.fx_rate_estimate ? `${booking.fx_rate_estimate} (${booking.fx_rate_source || "source unknown"})` : "—"}
             />
+          </div>
+
+          {/* Guest */}
+          <div style={styles.card}>
+            <div style={styles.sectionTitle}>Guest</div>
+            <Row k="Name" v={booking.guest_name || "—"} />
+            <Row k="Email" v={booking.guest_email || "—"} mono />
+            <Row k="Phone" v={booking.guest_phone || "—"} mono />
+            <Row k="Headcount" v={String(booking.headcount ?? "—")} />
+            <Row k="Requests" v={booking.special_requests || "—"} />
+          </div>
+
+          {/* Booking Scope */}
+          <div style={styles.card}>
+            <div style={styles.sectionTitle}>Booking Scope</div>
+            <Row k="Sessions" v={booking.booking_items_summary || "—"} />
+            <Row k="Divers" v={String(booking.total_pax ?? booking.headcount ?? "—")} />
+            <Row
+              k="Booking Window"
+              v={
+                booking.first_session_at_local && booking.last_session_at_local
+                  ? `${formatIsoForDisplay(booking.first_session_at_local)} → ${formatIsoForDisplay(booking.last_session_at_local)}`
+                  : "—"
+              }
+            />
+            <Row k="Sites" v={booking.sites_summary || booking.site_name || "—"} />
+            <Row k="Primary Session ID" v={booking.session_id || "—"} />
+            <Row k="Primary Itinerary ID" v={booking.itinerary_id || "—"} />
+            <Row k="Primary Itinerary Title" v={booking.itinerary_title || "—"} />
           </div>
 
           {/* Actions (disabled for now) */}

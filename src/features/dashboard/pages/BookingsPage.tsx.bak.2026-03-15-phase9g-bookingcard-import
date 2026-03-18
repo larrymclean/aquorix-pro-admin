@@ -30,18 +30,53 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../../../utils/api";
-import BookingCard, { type BookingCardData } from "../components/BookingCard";
 
 type ApiWeek = { start: string; end: string };
 
-type ApiBooking = BookingCardData & {
+type ApiBooking = {
+  booking_id: string;
+  booking_status: string;
+
+  payment_status: "paid" | "unpaid" | string;
+  payment_currency: string;
+  payment_amount_minor: string;
+  payment_amount: string;
+
+  hold_expires_at: string | null;
+
+  paid_at: string | null;
+
   requires_manual_review_derived: boolean;
   manual_review_required?: boolean;
   manual_review_reason?: string | null;
 
-  hold_expires_at?: string | null;
-  paid_at?: string | null;
-  updated_at?: string | null;
+  ui_status: string;
+
+  headcount: number;
+
+  guest_name: string;
+  guest_email: string;
+  guest_phone: string | null;
+
+  special_requests: string | null;
+  source: string;
+
+  created_at: string;
+  updated_at: string;
+
+  session_id: string;
+  itinerary_id: string;
+
+  dive_datetime_local: string;
+  session_date: string; // YYYY-MM-DD
+  start_time: string; // "13:00"
+  site_name: string;
+
+  itinerary_title: string;
+
+  itinerary_slot?: string | null;
+  itinerary_type?: string | null;
+  itinerary_location_type?: string | null;
 };
 
 type ApiResponse = {
@@ -79,6 +114,56 @@ function getLocalWeekStartYmd(d: Date) {
   return getLocalYmd(monday);
 }
 
+function formatDate(yyyyMmDd: string) {
+  // Safe: display as YYYY-MM-DD (keep deterministic; avoid locale surprises)
+  return yyyyMmDd || "unknown-date";
+}
+
+function formatMoney(currency: string, amount: string) {
+  // Backend already gives formatted payment_amount ("50.00") so just present it.
+  const cur = currency || "—";
+  const amt = amount || "—";
+  return `${cur} ${amt}`;
+}
+
+function badgeStyle(kind: "ok" | "warn" | "danger" | "neutral"): React.CSSProperties {
+  const base: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 800,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "#fff",
+    color: "#111827",
+    lineHeight: 1,
+    whiteSpace: "nowrap",
+  };
+
+  if (kind === "ok") return { ...base, background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)" };
+  if (kind === "warn") return { ...base, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.35)" };
+  if (kind === "danger") return { ...base, background: "rgba(220,38,38,0.10)", border: "1px solid rgba(220,38,38,0.30)" };
+  return { ...base, background: "rgba(0,0,0,0.04)" };
+}
+
+function getUiBadge(b: ApiBooking): { label: string; kind: "ok" | "warn" | "danger" | "neutral" } {
+  // Deterministic mapping from your backend-derived ui_status
+  const s = (b.ui_status || "").toLowerCase();
+
+  if (s === "paid_confirmed") return { label: "Paid • Confirmed", kind: "ok" };
+  if (s === "paid_manual_review") return { label: "Paid • Manual Review", kind: "warn" };
+  if (s === "payment_link_expired") return { label: "Payment Link Expired", kind: "danger" };
+  if (s === "cancelled") return { label: "Cancelled", kind: "neutral" };
+
+  // Fallbacks
+  if ((b.payment_status || "").toLowerCase() === "paid") return { label: "Paid", kind: "ok" };
+  if ((b.payment_status || "").toLowerCase() === "unpaid") return { label: "Unpaid", kind: "warn" };
+
+  return { label: b.ui_status || "Unknown", kind: "neutral" };
+}
+
 function matchesFilter(b: ApiBooking, filter: FilterKey): boolean {
   const ui = (b.ui_status || "").toLowerCase();
   const pay = (b.payment_status || "").toLowerCase();
@@ -93,26 +178,30 @@ function matchesFilter(b: ApiBooking, filter: FilterKey): boolean {
   return true;
 }
 
-function addDaysToYmd(ymd: string, days: number) {
-  const [yyyy, mm, dd] = ymd.split("-").map((n) => parseInt(n, 10));
-  const d = new Date(yyyy, mm - 1, dd);
-  d.setDate(d.getDate() + days);
-  return getLocalYmd(d);
+function safeCompare(a?: string | null, b?: string | null) {
+  return (a || "").localeCompare(b || "");
+}
+
+function sortBookings(list: ApiBooking[]): ApiBooking[] {
+  // Primary: session_date asc
+  // Secondary: start_time asc
+  // Tertiary: created_at desc (newest first) to keep stable
+  return [...list].sort((x, y) => {
+    const d = safeCompare(x.session_date, y.session_date);
+    if (d !== 0) return d;
+
+    const t = safeCompare(x.start_time, y.start_time);
+    if (t !== 0) return t;
+
+    // created_at desc
+    return safeCompare(y.created_at, x.created_at);
+  });
 }
 
 export default function BookingsPage() {
   const [state, setState] = useState<LoadState>({ status: "idle" });
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [weekStart, setWeekStart] = useState<string>(() => getLocalWeekStartYmd(new Date()));
   const nav = useNavigate();
-
-  function handlePreviousWeek() {
-    setWeekStart((prev) => addDaysToYmd(prev, -7));
-  }
-
-  function handleNextWeek() {
-    setWeekStart((prev) => addDaysToYmd(prev, 7));
-  }
 
   useEffect(() => {
     let isMounted = true;
@@ -121,6 +210,7 @@ export default function BookingsPage() {
       setState({ status: "loading" });
 
       try {
+        const weekStart = getLocalWeekStartYmd(new Date());
         const res = await apiFetch(`/api/v1/dashboard/bookings?week_start=${encodeURIComponent(weekStart)}`, { method: "GET" });
         const json = (await res.json().catch(() => ({}))) as any;
 
@@ -139,7 +229,7 @@ export default function BookingsPage() {
     return () => {
       isMounted = false;
     };
-    }, [weekStart]);
+  }, []);
 
   const bookings = useMemo(() => {
     if (state.status !== "ok") return [];
@@ -187,37 +277,6 @@ export default function BookingsPage() {
 
       {state.status === "ok" ? (
         <>
-          {/* Week navigation */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginBottom: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              type="button"
-              onClick={handlePreviousWeek}
-              style={styles.chip}
-            >
-              ◀ Previous Week
-            </button>
-
-            <div style={{ fontSize: 13, fontWeight: 800 }}>
-              Week {state.data.week?.start} → {state.data.week?.end}
-            </div>
-
-            <button
-              type="button"
-              onClick={handleNextWeek}
-              style={styles.chip}
-            >
-              Next Week ▶
-            </button>
-          </div>
           {/* Filter chips */}
           <div style={styles.chipsRow}>
             <Chip label={`All (${counts.all})`} active={filter === "all"} onClick={() => setFilter("all")} />
@@ -246,13 +305,11 @@ export default function BookingsPage() {
               {bookings.map((b) => (
                 <BookingCard
                   key={b.booking_id}
-                  booking={b}
+                  b={b}
                   onOpen={() => {
-                    const weekStart = getLocalWeekStartYmd(new Date());
-                    nav(`/dashboard/bookings/${b.booking_id}`, {
-                      state: { booking: b, weekStart },
-                    });
-                  }}
+                  const weekStart = getLocalWeekStartYmd(new Date());
+                  nav(`/dashboard/bookings/${b.booking_id}`, { state: { booking: b, weekStart } });
+                }}
                 />
               ))}
             </div>
@@ -273,6 +330,69 @@ function Chip(props: { label: string; active: boolean; onClick: () => void }) {
       }}
     >
       {props.label}
+    </button>
+  );
+}
+
+function BookingCard({ b, onOpen }: { b: ApiBooking; onOpen: () => void }) {
+  const badge = getUiBadge(b);
+
+  const needsReview = Boolean(b.requires_manual_review_derived);
+
+  return (
+    <button
+      onClick={onOpen}
+      style={{ ...styles.card, textAlign: "left", cursor: "pointer" }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis" }}>
+            {b.guest_name || "Guest"}{" "}
+            <span style={{ fontSize: 12, fontWeight: 800, opacity: 0.7 }}>• x{b.headcount ?? "—"}</span>
+          </div>
+
+          <div style={{ fontSize: 13, opacity: 0.85, marginBottom: 6 }}>
+            <strong>{b.site_name || "Site"}</strong> • {formatDate(b.session_date)} • {b.start_time || "—"}
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+            <span style={badgeStyle(badge.kind)}>{badge.label}</span>
+
+            {needsReview ? <span style={badgeStyle("warn")}>Needs Review</span> : null}
+
+            <span style={badgeStyle("neutral")}>{formatMoney(b.payment_currency, b.payment_amount)}</span>
+
+            <span style={badgeStyle("neutral")}>
+              Pay: {(b.payment_status || "unknown").toUpperCase()}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ textAlign: "right", fontSize: 12, opacity: 0.8 }}>
+          <div>
+            <strong>#{b.booking_id}</strong>
+          </div>
+          <div style={{ marginTop: 6 }}>{(b.source || "—").toUpperCase()}</div>
+        </div>
+      </div>
+
+      {/* Footer details */}
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid rgba(0,0,0,0.08)", fontSize: 12, opacity: 0.85 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          <span>
+            Session <strong>#{b.session_id}</strong>
+          </span>
+          <span>
+            Itinerary <strong>#{b.itinerary_id}</strong>
+          </span>
+          <span>
+            Status <strong>{(b.booking_status || "—").toUpperCase()}</strong>
+          </span>
+          {b.paid_at ? <span>Paid at {b.paid_at}</span> : null}
+          {b.hold_expires_at ? <span>Hold expires {b.hold_expires_at}</span> : null}
+          {b.manual_review_reason ? <span>Review: {b.manual_review_reason}</span> : null}
+        </div>
+      </div>
     </button>
   );
 }

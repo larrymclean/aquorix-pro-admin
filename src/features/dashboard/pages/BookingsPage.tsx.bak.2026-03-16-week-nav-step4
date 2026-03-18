@@ -187,37 +187,6 @@ export default function BookingsPage() {
 
       {state.status === "ok" ? (
         <>
-          {/* Week navigation */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginBottom: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <button
-              type="button"
-              onClick={handlePreviousWeek}
-              style={styles.chip}
-            >
-              ◀ Previous Week
-            </button>
-
-            <div style={{ fontSize: 13, fontWeight: 800 }}>
-              Week {state.data.week?.start} → {state.data.week?.end}
-            </div>
-
-            <button
-              type="button"
-              onClick={handleNextWeek}
-              style={styles.chip}
-            >
-              Next Week ▶
-            </button>
-          </div>
           {/* Filter chips */}
           <div style={styles.chipsRow}>
             <Chip label={`All (${counts.all})`} active={filter === "all"} onClick={() => setFilter("all")} />
