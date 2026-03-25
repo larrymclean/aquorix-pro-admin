@@ -396,7 +396,7 @@ body {
 .aqx-topnav-operator-name {
   font-size: 16px;
   font-weight: 600;
-  color: var(--aqx-accent, #00d4ff);
+  color: var(--aqx-accent, #68a3c2);
 }
 
 .aqx-topnav-actions { display: flex; gap: 8px; align-items: center; }
@@ -418,7 +418,7 @@ body {
 
 /* Buttons */
 .aqx-btn-primary {
-  background-color: var(--aqx-accent, #00d4ff);
+  background-color: var(--aqx-accent, #68a3c2);
   color: #071521;
   border-radius: 6px;
   padding: 0 20px;
@@ -451,6 +451,6 @@ body {
 /* Focus */
 .aqx-pro-dashboard-theme button:focus-visible,
 .aqx-pro-dashboard-theme a:focus-visible {
-  outline: 2px solid var(--aqx-accent, #00d4ff);
+  outline: 2px solid var(--aqx-accent, #68a3c2);
   outline-offset: 2px;
 }
