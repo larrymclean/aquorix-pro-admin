@@ -1,0 +1,102 @@
+/*
+ File: CoursesPage.tsx
+ Path: src/features/dashboard/pages/CoursesPage.tsx
+ Description: Course offerings + runs list for operator dashboard.
+ Author: AQUORIX Phase 10
+ Version: 1.0.1
+ Created: 2026-03-23
+
+ Change Log:
+ - 2026-03-23 - Initial creation (Phase 10 UI)
+ - 2026-03-23 - Fix route wiring to live backend response shape
+*/
+
+import React, { useEffect, useState } from 'react';
+
+type CourseRun = {
+  course_run_id: string;
+  start_at: string;
+  end_at: string;
+  max_capacity: number;
+  status: string;
+  linked_session_ids: number[];
+  location?: string | null;
+  notes?: string | null;
+};
+
+type Course = {
+  course_offering_id: number;
+  title: string;
+  certification_agency: string;
+  course_level: string;
+  base_price_minor: number;
+  currency: string;
+  max_students: number;
+  active_flag: boolean;
+  runs: CourseRun[];
+};
+
+const CoursesPage: React.FC = () => {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // TEMP: hardcode operator 146 (Poseidon test operator)
+  const operatorId = 146;
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const res = await fetch(`/api/v3/operator/${operatorId}/courses`);
+        const data = await res.json();
+        setCourses(data.courses || []);
+      } catch (err) {
+        console.error('Failed to load courses', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourses();
+  }, [operatorId]);
+
+  return (
+    <div className="aqx-main-inner">
+      <div className="aqx-main-header">
+        <h1>Courses</h1>
+        <p>Manage your course offerings and scheduled runs.</p>
+      </div>
+
+      {loading && <p>Loading courses...</p>}
+
+      {!loading && courses.length === 0 && (
+        <div className="aqx-card">
+          <p>No courses found for this operator.</p>
+        </div>
+      )}
+
+      {!loading && courses.length > 0 && (
+        <div className="aqx-metric-grid">
+          {courses.map((course) => (
+            <div key={course.course_offering_id} className="aqx-card">
+              <h3>{course.title}</h3>
+              <p>
+                {course.certification_agency} • {course.course_level}
+              </p>
+              <p>
+                Price: {(Number(course.base_price_minor) / 100).toFixed(2)} {course.currency}
+              </p>
+              <p>Max Students: {course.max_students}</p>
+              <p>Available Dates: {course.runs.length}</p>
+
+              <button className="aqx-btn-primary">
+                View Dates
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CoursesPage;

@@ -32,6 +32,7 @@ import ProDashboardMock from './features/dashboard/ProDashboardMock';
 import SchedulePage from './features/dashboard/pages/SchedulePage';
 import BookingsPage from './features/dashboard/pages/BookingsPage';
 import BookingDetailPage from './features/dashboard/pages/BookingDetailPage';
+import CoursesPage from './features/dashboard/pages/CoursesPage';
 
 import AuthCallback from './pages/AuthCallback';
 
@@ -84,6 +85,7 @@ function App() {
           <Route path="schedule" element={<SchedulePage />} />
           <Route path="bookings" element={<BookingsPage />} />
           <Route path="bookings/:bookingId" element={<BookingDetailPage />} />
+          <Route path="courses" element={<CoursesPage />} />
         </Route>
 
         {/* Not Authorized */}

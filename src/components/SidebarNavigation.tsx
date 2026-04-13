@@ -35,6 +35,7 @@ import {
   ClipboardList,
   User,
   DollarSign,
+  GraduationCap,
   PanelLeftClose,
   PanelLeftOpen,
   CircleDot,
@@ -69,6 +70,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   audit: FileText,
   calendar: Calendar,
   bookings: ClipboardList,
+  courses: GraduationCap,
   profile: User,
   commissions: DollarSign,
 };
