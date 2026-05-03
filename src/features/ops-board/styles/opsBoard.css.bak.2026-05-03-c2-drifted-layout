@@ -1,0 +1,121 @@
+body {
+  margin: 0;
+}
+
+.aqx-ops-board {
+  width: 100vw;
+  height: 100vh;
+  background: #ffffff;
+  color: #123044;
+  font-family: Arial, Helvetica, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+
+.aqx-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.aqx-operator {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.aqx-date {
+  font-size: 16px;
+  color: #4a5c6a;
+}
+
+.aqx-title {
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.aqx-weather,
+.aqx-time {
+  font-size: 18px;
+  text-align: right;
+}
+
+/* BODY */
+
+.aqx-body {
+  flex: 1;
+  padding: 20px 30px;
+}
+
+/* SESSION */
+
+.aqx-session {
+  border: 2px solid #0a6c9b;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.aqx-session-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.aqx-session-time {
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.aqx-session-title {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.aqx-session-meta {
+  font-size: 18px;
+  color: #4a5c6a;
+}
+
+/* ROSTER */
+
+.aqx-roster {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.aqx-roster-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 18px;
+}
+
+.status.ready {
+  color: green;
+  font-weight: 900;
+}
+
+.status.hold {
+  color: orange;
+  font-weight: 900;
+}
+
+.status.attention {
+  color: red;
+  font-weight: 900;
+}
+
+/* FOOTER */
+
+.aqx-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 30px;
+  border-top: 2px solid #e5e7eb;
+  font-size: 16px;
+}

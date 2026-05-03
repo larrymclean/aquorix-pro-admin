@@ -1,0 +1,82 @@
+/*
+ File: OpsBoardApp.tsx
+ Path: src/features/ops-board/OpsBoardApp.tsx
+ Description: Static Ops Board layout (no data yet)
+ Version: 0.2.0
+*/
+
+import React from 'react';
+import './styles/opsBoard.css';
+
+function OpsBoardApp() {
+  return (
+    <main className="aqx-ops-board">
+
+      {/* HEADER */}
+      <header className="aqx-header">
+        <div className="aqx-header-left">
+          <div className="aqx-operator">Nesima Diving Center</div>
+          <div className="aqx-date">Today — Dahab</div>
+        </div>
+
+        <div className="aqx-header-center">
+          <div className="aqx-title">Dive Ops Board</div>
+        </div>
+
+        <div className="aqx-header-right">
+          <div className="aqx-weather">Calm 🌊</div>
+          <div className="aqx-time">07:15</div>
+        </div>
+      </header>
+
+      {/* BODY */}
+      <section className="aqx-body">
+
+        {/* SESSION CARD */}
+        <div className="aqx-session">
+
+          <div className="aqx-session-header">
+            <div className="aqx-session-time">08:30</div>
+            <div className="aqx-session-title">Blue Hole</div>
+            <div className="aqx-session-meta">Boat • 12 / 16</div>
+          </div>
+
+          <div className="aqx-roster">
+
+            <div className="aqx-roster-item">
+              <span className="name">Anna K.</span>
+              <span className="status ready">✓</span>
+            </div>
+
+            <div className="aqx-roster-item">
+              <span className="name">Mark D.</span>
+              <span className="status hold">HOLD</span>
+            </div>
+
+            <div className="aqx-roster-item">
+              <span className="name">Sara L.</span>
+              <span className="status attention">!</span>
+            </div>
+
+            <div className="aqx-roster-item">
+              <span className="name">Tom R.</span>
+              <span className="status ready">✓</span>
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      {/* FOOTER */}
+      <footer className="aqx-footer">
+        <div>Emergency: DAN Hotline</div>
+        <div>Powered by AQUORIX</div>
+      </footer>
+
+    </main>
+  );
+}
+
+export default OpsBoardApp;
