@@ -33,6 +33,7 @@ import SchedulePage from './features/dashboard/pages/SchedulePage';
 import BookingsPage from './features/dashboard/pages/BookingsPage';
 import BookingDetailPage from './features/dashboard/pages/BookingDetailPage';
 import CoursesPage from './features/dashboard/pages/CoursesPage';
+import OpsBoardApp from './features/ops-board/OpsBoardApp';
 
 import AuthCallback from './pages/AuthCallback';
 
@@ -71,6 +72,16 @@ function App() {
           <Route index element={<Navigate to="/admin/overview" replace />} />
           <Route path="overview" element={<AdminOverview />} />
         </Route>
+
+        {/* Ops Board kiosk route */}
+        <Route
+          path="/ops-board"
+          element={
+            <RequireAuth>
+              <OpsBoardApp />
+            </RequireAuth>
+          }
+        />
 
         {/* Dashboard (ALL authenticated users: admin + pro + affiliate) */}
         <Route
