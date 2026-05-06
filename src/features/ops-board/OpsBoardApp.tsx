@@ -306,7 +306,10 @@ function OpsBoardApp() {
         const json = (await res.json()) as OpsBoardApiResponse;
 
         console.log('AQX OPS BOARD API STATUS:', res.status);
-        console.log('AQX OPS BOARD API BODY:', json);
+        console.log(
+          'AQX OPS BOARD API BODY:',
+          JSON.stringify(json, null, 2)
+        );
 
         if (!res.ok || !json.ok) {
           throw new Error(`Ops Board API failed with HTTP ${res.status}`);
