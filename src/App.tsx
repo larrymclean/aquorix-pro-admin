@@ -74,7 +74,14 @@ function App() {
         </Route>
 
         {/* Ops Board kiosk route — P10.7-C2 static fixture visual test only. Device auth comes later. */}
-        <Route path="/ops-board" element={<OpsBoardApp />} />
+        <Route
+          path="/ops-board"
+          element={
+            <RequireAuth>
+              <OpsBoardApp />
+            </RequireAuth>
+          }
+        />
 
         {/* Dashboard (ALL authenticated users: admin + pro + affiliate) */}
         <Route
