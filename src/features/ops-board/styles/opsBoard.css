@@ -118,7 +118,7 @@ body {
 
 .ops-row {
   display: grid;
-  grid-template-columns: 104px 112px minmax(390px, 0.78fr) minmax(760px, 1.35fr) 160px;
+  grid-template-columns: 104px 112px minmax(360px, 0.74fr) 92px minmax(700px, 1.35fr) 160px;
   gap: 16px;
   align-items: center;
   border: 2px solid #d3dde5;
@@ -145,10 +145,15 @@ body {
   color: #0a6c9b;
 }
 
+.session-details {
+  min-width: 0;
+}
+
 .title {
   font-size: 26px;
   font-weight: 900;
   color: #123044;
+  white-space: nowrap;
 }
 
 .cancelled-row .title {
@@ -175,6 +180,37 @@ body {
   color: #d97918;
 }
 
+.pax-card {
+  width: 76px;
+  min-height: 58px;
+  padding: 7px 8px 6px 8px;
+  border: 2px solid #d3dde5;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #123044;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  justify-self: center;
+}
+
+.pax-number {
+  font-size: 36px;
+  line-height: 0.9;
+  font-weight: 900;
+}
+
+.pax-label {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  color: #4a5c6a;
+}
+
 .roster {
   border-left: 2px solid #d3dde5;
   padding-left: 34px;
@@ -183,6 +219,18 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-width: 0;
+}
+
+.roster-notice {
+  justify-content: center;
+}
+
+.cancel-note {
+  font-size: 19px;
+  line-height: 1.2;
+  font-weight: 900;
+  color: #4a5c6a;
 }
 
 .roster-title {
@@ -293,34 +341,68 @@ body {
 }
 
 .status {
+  width: 76px;
+  min-height: 62px;
   text-align: center;
-  font-size: 19px;
   font-weight: 900;
   border-radius: 9px;
-  padding: 11px 10px;
+  padding: 8px 8px 7px 8px;
   border: 2px solid transparent;
   white-space: nowrap;
   overflow: hidden;
   box-sizing: border-box;
+  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #123044;
+}
+
+.status-number {
+  font-size: 36px;
+  line-height: 1;
+  font-weight: 900;
+  color: #123044;
+}
+
+.status-label {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  color: #123044;
+}
+
+.status-main {
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+}
+
+.status-cancelled-main {
+  text-decoration: line-through;
 }
 
 .available {
-  background: #d7f4e1;
+  background: #ffffff;
   color: #0f6630;
   border-color: #8fd8a8;
 }
 
 .nearly-full {
-  background: #fff2a8;
+  background: #ffffff;
   color: #7a5a00;
   border-color: #d9a600;
 }
 
 .cancelled {
-  background: #e0e3e6;
+  background: #ffffff;
   color: #4a4f54;
   border-color: #b8c0c7;
-  text-decoration: line-through;
 }
 
 .legend {

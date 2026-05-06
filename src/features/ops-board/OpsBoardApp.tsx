@@ -1,19 +1,94 @@
 /*
  * File: OpsBoardApp.tsx
  * Path: src/features/ops-board/OpsBoardApp.tsx
- * Description: Static React MVP shell for AQUORIX Dive Ops Board. Matches approved light whiteboard prototype.
+ * Description: Live API React MVP shell for AQUORIX Dive Ops Board.
  * Author: Larry McLean + ChatGPT
  * Created: 2026-05-03
- * Version: 0.2.0
- * Status: P10.7-C2 static fixture shell
+ * Version: 0.4.0
+ * Status: P10.7-C3 live API render
  *
  * Change Log:
  * - 2026-05-03: v0.1.0 - Initial standalone route shell.
  * - 2026-05-03: v0.2.0 - Replace drifted layout with approved Ops Board wireframe structure.
+ * - 2026-05-03: v0.3.0 - Add per-session PAX card column after session details.
+ * - 2026-05-05: v0.4.0 - Render Ops Board rows from /api/v1/ops-board live API data.
  */
 
 import React from 'react';
 import './styles/opsBoard.css';
+import { apiFetch } from '../../utils/api';
+
+type OpsBoardSession = {
+  id: string;
+  type: 'dive' | 'course';
+  title: string;
+  session_status: string;
+  ops_status: string;
+  capacity_total: number | null;
+  capacity_consumed: number;
+  capacity_remaining: number;
+  start_time: string;
+  site_name: string;
+  session_type: string;
+  session_date: string;
+  duration_days?: number | null;
+  metadata?: {
+    vessel_name?: string | null;
+    lead_guide_name?: string | null;
+    instructor_name?: string | null;
+    location?: string | null;
+    course_start_date?: string | null;
+    course_end_date?: string | null;
+  };
+};
+
+type OpsBoardSummary = {
+  booking_count: number;
+  confirmed_pax: number;
+  active_hold_pax: number;
+  waitlist_pax: number;
+  manual_review_count: number;
+  manual_review_pax: number;
+  has_pickups: boolean;
+  pickup_count: number;
+  has_notes: boolean;
+  nitrox_requested_count: number;
+  nitrox_cert_verified_count: number;
+  rental_gear_count: number;
+  own_gear_count: number;
+  has_minors: boolean;
+};
+
+type OpsBoardApiResponse = {
+  ok: boolean;
+  generated_at: string;
+  operator: {
+    slug: string;
+    name: string;
+    timezone: string;
+    currency: string;
+    operator_default_capacity: number;
+  };
+  window: {
+    type: string;
+    start: string;
+    end: string;
+  };
+  sessions: OpsBoardSession[];
+  session_summaries: Record<string, OpsBoardSummary>;
+  aggregates: {
+    total_sessions: number;
+    total_pax: number;
+    confirmed_pax_total: number;
+    active_hold_pax_total: number;
+    waitlist_pax_total: number;
+    nitrox_total: number;
+    rental_gear_total: number;
+    manual_review_total: number;
+    pickup_total: number;
+    minor_session_count: number;
+  };
+};
 
 function AlphaFlag() {
   return (
@@ -50,26 +125,6 @@ function CourseBookIcon() {
   );
 }
 
-function Ready() {
-  return <span className="person-dot person-ready">✓</span>;
-}
-
-function Warn() {
-  return <span className="person-dot person-warn">!</span>;
-}
-
-function Attention() {
-  return <span className="person-dot person-attention">⚠</span>;
-}
-
-function Ean() {
-  return <span className="ean-pill">EAN</span>;
-}
-
-function Tx() {
-  return <span className="tx-pill">Tx</span>;
-}
-
 function SunIcon() {
   return (
     <svg className="sun-icon" viewBox="0 0 64 64" aria-label="Sunny">
@@ -89,169 +144,263 @@ function SunIcon() {
   );
 }
 
+type OpsRowProps = {
+  time: string;
+  type: string;
+  title: React.ReactNode;
+  sub: string;
+  badges: React.ReactNode;
+  pax: number;
+  rosterTitle?: string;
+  rosterNotice?: React.ReactNode;
+  status: React.ReactNode;
+  cancelled?: boolean;
+};
+
+function OpsRow({
+  time,
+  type,
+  title,
+  sub,
+  badges,
+  pax,
+  rosterTitle = 'Roster',
+  rosterNotice,
+  status,
+  cancelled = false,
+}: OpsRowProps) {
+  return (
+    <div className={cancelled ? 'ops-row cancelled-row' : 'ops-row'}>
+      <div className="time">{time}</div>
+      <div className="type">{type}</div>
+
+      <div className="session-details">
+        <div className="title">{title}</div>
+        <div className="sub">{sub}</div>
+        <div className="badges">{badges}</div>
+      </div>
+
+      <div className="pax-card">
+        <div className="pax-number">{pax}</div>
+        <div className="pax-label">PAX</div>
+      </div>
+
+      <div className="roster roster-notice">
+        <div className="roster-title">{rosterTitle}</div>
+        <div className="cancel-note">{rosterNotice}</div>
+      </div>
+
+      {status}
+    </div>
+  );
+}
+
+function formatBoardDate(dateText: string): string {
+  const [yyyy, mm, dd] = dateText.split('-').map((part) => parseInt(part, 10));
+  const date = new Date(Date.UTC(yyyy, mm - 1, dd));
+  return date
+    .toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: '2-digit',
+      year: 'numeric',
+      timeZone: 'UTC',
+    })
+    .toUpperCase();
+}
+
+function formatSyncTime(generatedAt: string, timezone: string): string {
+  const date = new Date(generatedAt);
+  if (Number.isNaN(date.getTime())) return '--:--';
+
+  return date.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: timezone || 'UTC',
+  });
+}
+
+function getSessionIcon(session: OpsBoardSession): React.ReactNode {
+  if (session.type === 'course') return <CourseBookIcon />;
+  if (session.session_type === 'boat') return <AlphaFlag />;
+  return <DiverDownFlag />;
+}
+
+function getSubLine(session: OpsBoardSession): string {
+  if (session.type === 'course') {
+    const instructor = session.metadata?.instructor_name || 'Instructor TBD';
+    const location = session.metadata?.location || 'Training';
+    const days = session.duration_days ? ` — Day 1 of ${session.duration_days}` : '';
+    return `${instructor} — ${location}${days}`;
+  }
+
+  const guide = session.metadata?.lead_guide_name || 'Guide TBD';
+  const vessel = session.metadata?.vessel_name || 'SHORE';
+  return `${guide} — ${vessel}`;
+}
+
+function getBadges(session: OpsBoardSession, summary: OpsBoardSummary | undefined): React.ReactNode {
+  const badges: string[] = [];
+
+  if (summary?.active_hold_pax) badges.push(`HOLD ${summary.active_hold_pax}`);
+  if (summary?.waitlist_pax) badges.push(`WAIT ${summary.waitlist_pax}`);
+  if (summary?.pickup_count) badges.push(`PU ${summary.pickup_count}`);
+  if (summary?.nitrox_requested_count) badges.push(`EAN ${summary.nitrox_requested_count}`);
+  if (summary?.rental_gear_count) badges.push(`GEAR ${summary.rental_gear_count}`);
+  if (summary?.has_minors) badges.push('MINOR');
+  if (summary?.has_notes) badges.push('NOTE');
+
+  if (summary?.manual_review_count) {
+    badges.push(`REVIEW ${summary.manual_review_count}`);
+  }
+
+  if (badges.length === 0) return 'READY';
+
+  return badges.join(' | ');
+}
+
+function getStatus(session: OpsBoardSession): React.ReactNode {
+  if (session.session_status === 'cancelled' || session.ops_status === 'cancelled') {
+    return (
+      <div className="status cancelled">
+        <div className="status-number">0</div>
+        <div className="status-label">SPOTS</div>
+      </div>
+    );
+  }
+
+  const remaining = Math.max(session.capacity_remaining || 0, 0);
+  const statusClass = remaining <= 2 ? 'status nearly-full' : 'status available';
+
+  return (
+    <div className={statusClass}>
+      <div className="status-number">{remaining}</div>
+      <div className="status-label">SPOTS</div>
+    </div>
+  );
+}
+
+function getRosterNotice(session: OpsBoardSession, summary: OpsBoardSummary | undefined): string {
+  if (session.session_status === 'cancelled' || session.ops_status === 'cancelled') {
+    return 'See staff for more information.';
+  }
+
+  if (!summary || summary.booking_count === 0) {
+    return 'No roster yet.';
+  }
+
+  return 'Roster details loading.';
+}
+
 function OpsBoardApp() {
+  const [data, setData] = React.useState<OpsBoardApiResponse | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    async function loadOpsBoardApi() {
+      try {
+        const res = await apiFetch('/api/v1/ops-board?window=today', { method: 'GET' });
+        const json = (await res.json()) as OpsBoardApiResponse;
+
+        console.log('AQX OPS BOARD API STATUS:', res.status);
+        console.log('AQX OPS BOARD API BODY:', json);
+
+        if (!res.ok || !json.ok) {
+          throw new Error(`Ops Board API failed with HTTP ${res.status}`);
+        }
+
+        if (isMounted) {
+          setData(json);
+          setError(null);
+        }
+      } catch (err) {
+        console.error('AQX OPS BOARD API ERROR:', err);
+
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Unknown Ops Board API error');
+        }
+      }
+    }
+
+    loadOpsBoardApi();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <div className="ops-board">
+        <div className="strip">AQUORIX OPS BOARD API ERROR</div>
+        <div className="cancel-note">{error}</div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="ops-board">
+        <div className="strip">LOADING AQUORIX OPS BOARD...</div>
+      </div>
+    );
+  }
+
+  const boardDate = formatBoardDate(data.window.start);
+  const syncTime = formatSyncTime(data.generated_at, data.operator.timezone);
+
   return (
     <div className="ops-board">
       <div className="ops-top">
         <div className="ops-brand">
-          <img src="/logo-placeholder.png" alt="Blue Current Divers Logo" />
-          <div className="ops-operator-name">BLUE CURRENT DIVERS</div>
+          <img src="/operator-logo.png" alt={`${data.operator.name} Logo`} />
+          <div className="ops-operator-name">{data.operator.name.toUpperCase()}</div>
         </div>
 
         <div className="ops-weather">
-          <div className="weather-icon-wrap">
-            <SunIcon />
-          </div>
+          <div className="weather-icon-wrap"><SunIcon /></div>
           <div>
             <div className="weather-main">SUNNY</div>
             <div className="weather-sub">AIR 29°C | WATER 24°C | WIND LIGHT</div>
           </div>
         </div>
 
-        <div className="date-time">SAT MAY 02, 2026&nbsp;&nbsp;08:12</div>
+        <div className="date-time">{boardDate}&nbsp;&nbsp;{syncTime}</div>
       </div>
 
       <div className="sync">
         <span className="online-dot"></span>
-        <span>ONLINE | LAST SYNC: 08:11</span>
+        <span>ONLINE | LAST SYNC: {syncTime}</span>
       </div>
 
       <div className="strip">
-        25 PAX | 6 PU | 7 EAN | 2 TX | 23 GEAR | REVIEW 1 | WAIT 3 | HOLD 4
+        {data.aggregates.total_pax} PAX | {data.aggregates.pickup_total} PU | {data.aggregates.nitrox_total} EAN | 0 TX | {data.aggregates.rental_gear_total} GEAR | REVIEW {data.aggregates.manual_review_total} | WAIT {data.aggregates.waitlist_pax_total} | HOLD {data.aggregates.active_hold_pax_total}
       </div>
 
-      <div className="ops-row cancelled-row">
-        <div className="time">07:30</div>
-        <div className="type">DIVE</div>
-        <div>
-          <div className="title">Cedar Pride Wreck <AlphaFlag /></div>
-          <div className="sub">Omar Khalil — Dolphin</div>
-          <div className="badges">PU 1 | <span className="review">REVIEW</span> | NOTE</div>
-        </div>
-        <div className="roster">
-          <div className="roster-title">Roster</div>
-          <div className="roster-grid">
-            <div className="roster-line"><span className="roster-num">1.</span>Sarah B.<Warn /></div>
-            <div className="roster-line"><span className="roster-num">2.</span>Mark T.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">3.</span>Nadia K.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">4.</span>Rashid H.<Warn /></div>
-          </div>
-        </div>
-        <div className="status cancelled">CANCELLED</div>
-      </div>
+      {data.sessions.map((session) => {
+        const summary = data.session_summaries[session.id];
+        const isCancelled = session.session_status === 'cancelled' || session.ops_status === 'cancelled';
+        const pax = summary ? summary.confirmed_pax + summary.active_hold_pax : session.capacity_consumed;
 
-      <div className="ops-row">
-        <div className="time">08:00</div>
-        <div className="type">COURSE</div>
-        <div>
-          <div className="title">Open Water Scuba Diver <CourseBookIcon /></div>
-          <div className="sub">Layla Mansour — Classroom / Confined — Day 2 of 4</div>
-          <div className="badges">PU 2 | GEAR 4</div>
-        </div>
-        <div className="roster">
-          <div className="roster-title">Roster</div>
-          <div className="roster-grid">
-            <div className="roster-line"><span className="roster-num">1.</span>Emma R.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">2.</span>Noah K.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">3.</span>Maya H.<Warn /></div>
-            <div className="roster-line"><span className="roster-num">4.</span>Owen P.<Ready /></div>
-          </div>
-        </div>
-        <div className="status nearly-full">2 SPOTS</div>
-      </div>
-
-      <div className="ops-row">
-        <div className="time">08:30</div>
-        <div className="type">DIVE</div>
-        <div>
-          <div className="title">Japanese Garden <DiverDownFlag /></div>
-          <div className="sub">Yasmin Haddad — SHORE</div>
-          <div className="badges">PU 1 | EAN 2 | GEAR 4 | MINOR | NOTE</div>
-        </div>
-        <div className="roster">
-          <div className="roster-title">Roster</div>
-          <div className="roster-grid">
-            <div className="roster-line"><span className="roster-num">1.</span>Larry M.<Ean /><Ready /></div>
-            <div className="roster-line"><span className="roster-num">2.</span>Shawn S.<Ean /><Warn /></div>
-            <div className="roster-line"><span className="roster-num">3.</span>Juliet O.<Attention /></div>
-          </div>
-        </div>
-        <div className="status available">5 SPOTS</div>
-      </div>
-
-      <div className="ops-row">
-        <div className="time">10:30</div>
-        <div className="type">DIVE</div>
-        <div>
-          <div className="title">Power Station <DiverDownFlag /></div>
-          <div className="sub">Nabil Al-Rashid — SHORE</div>
-          <div className="badges">HOLD 2 | PU 1 | EAN 1 | GEAR 4 | NOTE</div>
-        </div>
-        <div className="roster">
-          <div className="roster-title">Roster</div>
-          <div className="roster-grid">
-            <div className="roster-line"><span className="roster-num">1.</span>Amir S.<Ean /><Ready /></div>
-            <div className="roster-line"><span className="roster-num">2.</span>Leah C.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">3.</span>Tom B.<Warn /></div>
-            <div className="roster-line"><span className="roster-num">4.</span>Renee J.<Warn /></div>
-          </div>
-        </div>
-        <div className="status available">5 SPOTS</div>
-      </div>
-
-      <div className="ops-row">
-        <div className="time">14:00</div>
-        <div className="type">DIVE</div>
-        <div>
-          <div className="title">Cedar Pride Wreck <AlphaFlag /></div>
-          <div className="sub">Omar Khalil — Dolphin</div>
-          <div className="badges">WAIT 3 | <span className="review">REVIEW</span> | PU 1 | EAN 4 | GEAR 4 | NOTE</div>
-        </div>
-        <div className="roster">
-          <div className="roster-title">Roster</div>
-          <div className="roster-grid">
-            <div className="roster-line"><span className="roster-num">1.</span>Larry M.<Ean /><Ready /></div>
-            <div className="roster-line"><span className="roster-num">2.</span>Shawn S.<Ean /><Ready /></div>
-            <div className="roster-line"><span className="roster-num">3.</span>Burton G.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">4.</span>Juliet O.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">5.</span>Carlton L.<Ean /><Tx /><Ready /></div>
-            <div className="roster-line"><span className="roster-num">6.</span>Henry S.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">7.</span>Woody S.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">8.</span>Despereaux P.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">9.</span>Buzz M.<Warn /></div>
-            <div className="roster-line"><span className="roster-num">10.</span>Marlowe V.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">11.</span>Abigail L.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">12.</span>Rachel S.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">13.</span>Gus G.<Ean /><Warn /></div>
-            <div className="roster-line"><span className="roster-num">14.</span>Lassiter C.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">15.</span>Karen V.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">16.</span>Mary L.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">17.</span>Chief V.<Attention /></div>
-            <div className="roster-line"><span className="roster-num">18.</span>Ewan O.<Ean /><Ready /></div>
-            <div className="roster-line"><span className="roster-num">19.</span>Declan R.<Ready /></div>
-            <div className="roster-line"><span className="roster-num">20.</span>Pierre D.<Ean /><Tx /><Ready /></div>
-          </div>
-        </div>
-        <div className="status available">6 SPOTS</div>
-      </div>
-
-      <div className="ops-row">
-        <div className="time">16:30</div>
-        <div className="type">DIVE</div>
-        <div>
-          <div className="title">Power Station <DiverDownFlag /></div>
-          <div className="sub">Yasmin Haddad — SHORE</div>
-          <div className="badges">HOLD 2 | GEAR 2 | NOTE</div>
-        </div>
-        <div className="roster">
-          <div className="roster-title">Roster</div>
-          <div className="roster-grid">
-            <div className="roster-line"><span className="roster-num">1.</span>Rami A.<Warn /></div>
-            <div className="roster-line"><span className="roster-num">2.</span>Lina F.<Ready /></div>
-          </div>
-        </div>
-        <div className="status available">8 SPOTS</div>
-      </div>
+        return (
+          <OpsRow
+            key={session.id}
+            time={session.start_time}
+            type={session.type === 'course' ? 'COURSE' : 'DIVE'}
+            title={<>{session.title} {getSessionIcon(session)}</>}
+            sub={getSubLine(session)}
+            badges={getBadges(session, summary)}
+            pax={pax}
+            cancelled={isCancelled}
+            rosterTitle={isCancelled ? 'Cancelled' : 'Roster'}
+            rosterNotice={getRosterNotice(session, summary)}
+            status={getStatus(session)}
+          />
+        );
+      })}
 
       <div className="legend">
         <span><span className="legend-pill legend-ok">✓</span> Ready</span>
@@ -277,23 +426,14 @@ function OpsBoardApp() {
           <div className="footer-center">
             <span>Powered by AQUORIX</span>
             <svg className="nautilus-mark" viewBox="0 0 64 64" aria-label="AQUORIX nautilus placeholder">
-              <path
-                d="M50 32 C50 42 42 50 32 50 C21 50 14 43 14 33 C14 23 21 16 31 16 C39 16 45 22 45 30 C45 37 40 42 33 42 C27 42 23 38 23 33 C23 28 27 24 32 24 C36 24 39 27 39 31 C39 34 36 37 33 37 C30 37 28 35 28 32 C28 30 30 28 32 28"
-                fill="none"
-                stroke="#0a6c9b"
-                strokeWidth="5"
-                strokeLinecap="round"
-              />
+              <path d="M50 32 C50 42 42 50 32 50 C21 50 14 43 14 33 C14 23 21 16 31 16 C39 16 45 22 45 30 C45 37 40 42 33 42 C27 42 23 38 23 33 C23 28 27 24 32 24 C36 24 39 27 39 31 C39 34 36 37 33 37 C30 37 28 35 28 32 C28 30 30 28 32 28" fill="none" stroke="#0a6c9b" strokeWidth="5" strokeLinecap="round" />
               <circle cx="32" cy="32" r="27" fill="none" stroke="#248dc1" strokeWidth="3" />
             </svg>
           </div>
         </div>
 
         <div className="qr-area">
-          <div className="qr-text">
-            SCAN TO REGISTER
-            <span>Forms • Waivers • Updates</span>
-          </div>
+          <div className="qr-text">SCAN TO REGISTER<span>Forms • Waivers • Updates</span></div>
           <div className="qr-box" aria-label="QR code placeholder"></div>
         </div>
       </div>
