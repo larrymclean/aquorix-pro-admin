@@ -44,6 +44,18 @@ import { useDashboardSchedule } from "../../../hooks/useDashboardSchedule";
 import type { DashboardScheduleSession } from "../../../types/dashboardSchedule";
 import { createDashboardSession, cancelDashboardSession } from "../../../api/dashboardSchedule";
 
+function formatMinorPrice(amount: number | null | undefined, currency: string | null | undefined) {
+  if (amount === null || amount === undefined || !currency) return "Price TBD";
+
+  const divisor = currency === "JOD" ? 1000 : 100;
+  return `${(amount / divisor).toFixed(currency === "JOD" ? 3 : 2)} ${currency}`;
+}
+
+function statusLabel(value: string | null | undefined) {
+  if (!value) return "unknown";
+  return value.replace(/_/g, " ");
+}
+
 function groupByDate(sessions: DashboardScheduleSession[]) {
   const map: Record<string, DashboardScheduleSession[]> = {};
   for (const s of sessions) {
@@ -311,11 +323,26 @@ export default function SchedulePage() {
                     <div style={styles.mainCol}>
                       <div style={styles.titleLine}>
                         <strong>{s.site_name}</strong>{" "}
-                        <span style={styles.subtle}>({s.session_type})</span>
+                        <span style={styles.typeBadge}>{s.type || s.session_type}</span>
+                        <span style={styles.statusBadge}>{statusLabel(s.ops_status)}</span>
                       </div>
+
                       <div style={styles.subtle}>
                         {s.itinerary_title} • {s.team_name}
                       </div>
+
+                      <div style={styles.detailGrid}>
+                        <span>Capacity: {s.capacity_consumed ?? 0}/{s.capacity_total ?? "—"}</span>
+                        <span>Remaining: {s.capacity_remaining ?? "—"}</span>
+                        <span>{formatMinorPrice(s.price_from_minor, s.currency)}</span>
+                        <span>{s.vessel_name || (s.metadata as any)?.location || "No vessel/location"}</span>
+                        <span>{(s.metadata as any)?.lead_guide_name || (s.metadata as any)?.instructor_name || "Staff TBD"}</span>
+                      </div>
+
+                      {s.session_status === "cancelled" ? (
+                        <div style={styles.cancelledNote}>Cancelled — visible for operational awareness.</div>
+                      ) : null}
+
                       {s.notes ? <div style={styles.notes}>{s.notes}</div> : null}
                     </div>
 
@@ -399,7 +426,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sessionRow: {
     display: "grid",
-    gridTemplateColumns: "110px 1fr 90px",
+    gridTemplateColumns: "90px minmax(0, 1fr) 130px",
     gap: 12,
     padding: 12,
     border: "1px solid rgba(0,0,0,0.08)",
@@ -421,6 +448,46 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 8,
     fontSize: 13,
     opacity: 0.9
+  },
+
+  typeBadge: {
+    display: "inline-block",
+    marginLeft: 6,
+    padding: "2px 7px",
+    borderRadius: 999,
+    background: "rgba(0, 212, 255, 0.16)",
+    color: "#06344A",
+    fontSize: 12,
+    fontWeight: 800,
+    textTransform: "uppercase"
+  },
+  statusBadge: {
+    display: "inline-block",
+    marginLeft: 6,
+    padding: "2px 7px",
+    borderRadius: 999,
+    background: "rgba(0,0,0,0.08)",
+    color: "#263238",
+    fontSize: 12,
+    fontWeight: 700,
+    textTransform: "uppercase"
+  },
+  detailGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "4px 10px",
+    marginTop: 8,
+    fontSize: 13,
+    opacity: 0.9
+  },
+  cancelledNote: {
+    marginTop: 8,
+    padding: "6px 8px",
+    borderRadius: 8,
+    background: "rgba(255,0,0,0.08)",
+    color: "rgba(150,0,0,0.95)",
+    fontSize: 13,
+    fontWeight: 700
   },
   bannerWarn: {
     padding: 12,
