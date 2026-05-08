@@ -4,14 +4,15 @@
  * Description: Live API React MVP shell for AQUORIX Dive Ops Board.
  * Author: Larry McLean + ChatGPT
  * Created: 2026-05-03
- * Version: 0.4.0
- * Status: P10.7-C3 live API render
+ * Version: 0.4.1
+ * Status: P10.7-C4 dev identity/context visibility
  *
  * Change Log:
  * - 2026-05-03: v0.1.0 - Initial standalone route shell.
  * - 2026-05-03: v0.2.0 - Replace drifted layout with approved Ops Board wireframe structure.
  * - 2026-05-03: v0.3.0 - Add per-session PAX card column after session details.
  * - 2026-05-05: v0.4.0 - Render Ops Board rows from /api/v1/ops-board live API data.
+ * - 2026-05-07: v0.4.1 - Add dev-only identity/context banner to prevent stale-session/operator confusion.
  */
 
 import React from 'react';
@@ -90,6 +91,76 @@ type OpsBoardApiResponse = {
   };
 };
 
+// Set "me type"
+type DevMeResponse = {
+  ok: boolean;
+  ui_mode?: string;
+  user?: {
+    email?: string;
+    role?: string;
+    tier?: string;
+  };
+  operator_context?: {
+    active_operator_id?: string | number | null;
+    affiliations?: Array<{
+      operator_id?: string | number;
+      name?: string;
+      slug?: string;
+      role?: string;
+    }>;
+  };
+};
+
+// Add Identity Banner Function - Beta/Dev Only Function. Visible internally only
+function DevIdentityBanner({
+  me,
+  data,
+}: {
+  me: DevMeResponse | null;
+  data: OpsBoardApiResponse | null;
+}) {
+  if (process.env.NODE_ENV === 'production') return null;
+
+  const activeOperatorId = me?.operator_context?.active_operator_id
+    ? String(me.operator_context.active_operator_id)
+    : null;
+
+  const activeAffiliation = me?.operator_context?.affiliations?.find(
+    (affiliation) => String(affiliation.operator_id) === activeOperatorId
+  );
+
+  const email = me?.user?.email || 'unknown-user';
+  const role = me?.user?.role || 'unknown-role';
+  const tier = me?.user?.tier || 'unknown-tier';
+  const operatorName = activeAffiliation?.name || data?.operator?.name || 'NONE';
+  const operatorSlug = activeAffiliation?.slug || data?.operator?.slug || 'none';
+  const apiBase = process.env.REACT_APP_API_BASE_URL || 'default-api';
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        left: 8,
+        bottom: 8,
+        zIndex: 9999,
+        maxWidth: 'calc(100vw - 16px)',
+        padding: '6px 10px',
+        borderRadius: 8,
+        background: 'rgba(0, 0, 0, 0.82)',
+        color: '#ffffff',
+        fontSize: 11,
+        lineHeight: 1.35,
+        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+        letterSpacing: '0.02em',
+        pointerEvents: 'none',
+      }}
+    >
+      DEV | {email} | {role}/{tier} | operator: {operatorName} #{activeOperatorId || 'NONE'} | slug: {operatorSlug} | API: {apiBase}
+    </div>
+  );
+}
+
+// LSM Dev Note: We need a better Alpha Flag and Dive Flag svg. This is a rough wireframe.
 function AlphaFlag() {
   return (
     <span className="title-icon">
@@ -295,6 +366,7 @@ function getRosterNotice(session: OpsBoardSession, summary: OpsBoardSummary | un
 
 function OpsBoardApp() {
   const [data, setData] = React.useState<OpsBoardApiResponse | null>(null);
+  const [meData, setMeData] = React.useState<DevMeResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -302,6 +374,20 @@ function OpsBoardApp() {
 
     async function loadOpsBoardApi() {
       try {
+        try {
+          const meRes = await apiFetch('/api/v1/me', { method: 'GET' });
+          const meJson = (await meRes.json()) as DevMeResponse;
+
+          console.log('AQX DEV IDENTITY STATUS:', meRes.status);
+          console.log('AQX DEV IDENTITY BODY:', meJson);
+
+          if (isMounted && meRes.ok && meJson.ok) {
+            setMeData(meJson);
+          }
+        } catch (meErr) {
+          console.warn('AQX DEV IDENTITY LOAD FAILED:', meErr);
+        }
+
         const res = await apiFetch('/api/v1/ops-board?window=today', { method: 'GET' });
         const json = (await res.json()) as OpsBoardApiResponse;
 
@@ -338,6 +424,7 @@ function OpsBoardApp() {
   if (error) {
     return (
       <div className="ops-board">
+        <DevIdentityBanner me={meData} data={data} />
         <div className="strip">AQUORIX OPS BOARD API ERROR</div>
         <div className="cancel-note">{error}</div>
       </div>
@@ -347,6 +434,7 @@ function OpsBoardApp() {
   if (!data) {
     return (
       <div className="ops-board">
+        <DevIdentityBanner me={meData} data={data} />
         <div className="strip">LOADING AQUORIX OPS BOARD...</div>
       </div>
     );
@@ -357,6 +445,7 @@ function OpsBoardApp() {
 
   return (
     <div className="ops-board">
+      <DevIdentityBanner me={meData} data={data} />
       <div className="ops-top">
         <div className="ops-brand">
           <img src="/operator-logo.png" alt={`${data.operator.name} Logo`} />
