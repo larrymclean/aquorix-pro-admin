@@ -312,31 +312,58 @@ export default function SchedulePage() {
                 const isCancelling = isDiveSession && cancellingId === Number(s.session_id);
 
                 return (
-                  <div key={rowKey} style={styles.sessionRow}>
-                    <div style={styles.timeCol}>
-                      <div>
-                        <strong>{s.start_time}</strong>
-                      </div>
-                      <div style={styles.subtle}>Meet {s.meet_time || "—"}</div>
+                  <div
+                    key={rowKey}
+                    style={{
+                      ...styles.sessionRow,
+                      ...(s.session_status === "cancelled" ? styles.cancelledRow : null)
+                    }}
+                  >
+                    <div style={styles.timeRail}>
+                      <div style={styles.startTime}>{s.start_time}</div>
+                      <div style={styles.meetTime}>Meet {s.meet_time || "—"}</div>
                     </div>
 
-                    <div style={styles.mainCol}>
-                      <div style={styles.titleLine}>
-                        <strong>{s.site_name}</strong>{" "}
+                    <div style={styles.opsContent}>
+                      <div style={styles.opsTitleLine}>
+                        <strong style={{ fontSize: 20 }}>{s.site_name}</strong>
                         <span style={styles.typeBadge}>{s.type || s.session_type}</span>
                         <span style={styles.statusBadge}>{statusLabel(s.ops_status)}</span>
                       </div>
 
-                      <div style={styles.subtle}>
+                      <div style={styles.opsSubLine}>
                         {s.itinerary_title} • {s.team_name}
                       </div>
 
-                      <div style={styles.detailGrid}>
-                        <span>Capacity: {s.capacity_consumed ?? 0}/{s.capacity_total ?? "—"}</span>
-                        <span>Remaining: {s.capacity_remaining ?? "—"}</span>
-                        <span>{formatMinorPrice(s.price_from_minor, s.currency)}</span>
-                        <span>{s.vessel_name || (s.metadata as any)?.location || "No vessel/location"}</span>
-                        <span>{(s.metadata as any)?.lead_guide_name || (s.metadata as any)?.instructor_name || "Staff TBD"}</span>
+                      <div style={styles.opsMetrics}>
+                        <div>
+                          <div style={styles.metricLabel}>Capacity</div>
+                          <div style={styles.metricValue}>{s.capacity_consumed ?? 0}/{s.capacity_total ?? "—"}</div>
+                        </div>
+
+                        <div>
+                          <div style={styles.metricLabel}>Remaining</div>
+                          <div style={styles.metricValue}>{s.capacity_remaining ?? "—"}</div>
+                        </div>
+
+                        <div>
+                          <div style={styles.metricLabel}>Price</div>
+                          <div style={styles.metricValue}>{formatMinorPrice(s.price_from_minor, s.currency)}</div>
+                        </div>
+
+                        <div>
+                          <div style={styles.metricLabel}>{s.type === "course" ? "Location" : "Vessel"}</div>
+                          <div style={styles.metricValue}>
+                            {s.vessel_name || (s.metadata as any)?.location || "—"}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div style={styles.metricLabel}>Staff</div>
+                          <div style={styles.metricValue}>
+                            {(s.metadata as any)?.lead_guide_name || (s.metadata as any)?.instructor_name || "TBD"}
+                          </div>
+                        </div>
                       </div>
 
                       {s.session_status === "cancelled" ? (
@@ -346,8 +373,8 @@ export default function SchedulePage() {
                       {s.notes ? <div style={styles.notes}>{s.notes}</div> : null}
                     </div>
 
-                    <div style={styles.idCol}>
-                      <div style={styles.subtle}>
+                    <div style={styles.actionRail}>
+                      <div style={styles.unifiedId}>
                         {(s as any).unified_id || `#${s.session_id}`}
                       </div>
 
@@ -355,22 +382,12 @@ export default function SchedulePage() {
                         <button
                           onClick={() => handleCancel(Number(s.session_id))}
                           disabled={isCancelling}
-                          style={{
-                            marginTop: 8,
-                            padding: "6px 10px",
-                            borderRadius: 8,
-                            cursor: isCancelling ? "not-allowed" : "pointer",
-                            border: "1px solid rgba(255,0,0,0.35)",
-                            background: "rgba(255,0,0,0.10)",
-                            color: "rgba(180,0,0,0.95)",
-                            fontWeight: 700,
-                            fontSize: 12
-                          }}
+                          style={styles.cancelButton}
                         >
                           {isCancelling ? "Cancelling…" : "Cancel"}
                         </button>
                       ) : (
-                        <div style={{ ...styles.subtle, marginTop: 8 }}>Course inventory</div>
+                        <div style={styles.courseInventoryLabel}>Course inventory</div>
                       )}
                     </div>
                   </div>
@@ -386,7 +403,7 @@ export default function SchedulePage() {
 
 const styles: Record<string, React.CSSProperties> = {
   page: {
-    padding: 16,
+    padding: "24px 28px 48px",
     maxWidth: 1100,
     margin: "0 auto"
   },
@@ -415,80 +432,163 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: "hidden"
   },
   dayHeader: {
-    padding: "10px 12px",
-    background: "rgba(0,0,0,0.04)",
-    fontWeight: 700
+    padding: "14px 16px",
+    background: "rgba(0,0,0,0.03)",
+    fontWeight: 800,
+    fontSize: 18,
+    borderBottom: "1px solid rgba(0,0,0,0.05)"
   },
   dayList: {
     padding: 10,
     display: "grid",
-    gap: 10
+    gap: 16
   },
   sessionRow: {
     display: "grid",
     gridTemplateColumns: "90px minmax(0, 1fr) 130px",
-    gap: 12,
-    padding: 12,
-    border: "1px solid rgba(0,0,0,0.08)",
-    borderRadius: 10
+    gap: 14,
+    padding: 14,
+    border: "1px solid rgba(0,0,0,0.05)",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+    borderRadius: 12,
+    background: "#ffffff",
+    alignItems: "start"
   },
-  timeCol: {},
-  mainCol: {},
-  idCol: {
-    textAlign: "right"
-  },
-  subtle: {
-    opacity: 0.75,
-    fontSize: 13
-  },
-  titleLine: {
-    marginBottom: 4
-  },
-  notes: {
-    marginTop: 8,
-    fontSize: 13,
-    opacity: 0.9
-  },
-
-  typeBadge: {
-    display: "inline-block",
-    marginLeft: 6,
-    padding: "2px 7px",
-    borderRadius: 999,
-    background: "rgba(0, 212, 255, 0.16)",
-    color: "#06344A",
-    fontSize: 12,
-    fontWeight: 800,
-    textTransform: "uppercase"
-  },
-  statusBadge: {
-    display: "inline-block",
-    marginLeft: 6,
-    padding: "2px 7px",
-    borderRadius: 999,
-    background: "rgba(0,0,0,0.08)",
-    color: "#263238",
-    fontSize: 12,
-    fontWeight: 700,
-    textTransform: "uppercase"
-  },
-  detailGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "4px 10px",
-    marginTop: 8,
-    fontSize: 13,
-    opacity: 0.9
-  },
-  cancelledNote: {
-    marginTop: 8,
-    padding: "6px 8px",
-    borderRadius: 8,
-    background: "rgba(255,0,0,0.08)",
-    color: "rgba(150,0,0,0.95)",
-    fontSize: 13,
-    fontWeight: 700
-  },
+cancelledRow: {
+  background: "rgba(255,0,0,0.025)"
+},
+timeRail: {
+  borderRight: "1px solid rgba(0,0,0,0.08)",
+  paddingRight: 10
+},
+startTime: {
+  fontSize: 24,
+  fontWeight: 800,
+  lineHeight: 1,
+  letterSpacing: "-0.5px"
+},
+meetTime: {
+  marginTop: 4,
+  fontSize: 12,
+  opacity: 0.7
+},
+opsContent: {
+  minWidth: 0
+},
+opsTitleLine: {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  flexWrap: "wrap",
+  fontSize: 16,
+  marginBottom: 4
+},
+opsSubLine: {
+  fontSize: 13,
+  opacity: 0.72,
+  marginBottom: 10
+},
+opsMetrics: {
+  display: "grid",
+  gridTemplateColumns: "repeat(5, minmax(90px, 1fr))",
+  gap: 10,
+  marginTop: 8
+},
+metricLabel: {
+  fontSize: 10,
+  opacity: 0.45,
+  textTransform: "uppercase",
+  fontWeight: 700,
+  letterSpacing: "0.05em"
+},
+metricValue: {
+  fontSize: 13,
+  fontWeight: 700,
+  marginTop: 2
+},
+actionRail: {
+  textAlign: "right",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end",
+  justifyContent: "space-between",
+  minHeight: "100%"
+},
+unifiedId: {
+  fontSize: 12,
+  opacity: 0.7,
+  wordBreak: "break-word"
+},
+cancelButton: {
+  marginTop: 10,
+  padding: "8px 12px",
+  borderRadius: 10,
+  cursor: "pointer",
+  border: "1px solid rgba(255,0,0,0.35)",
+  background: "#fff5f5",
+  color: "rgba(180,0,0,0.95)",
+  fontWeight: 700,
+  fontSize: 12
+},
+courseInventoryLabel: {
+  marginTop: 10,
+  fontSize: 12,
+  opacity: 0.7
+},
+timeCol: {},
+mainCol: {},
+idCol: {
+  textAlign: "right"
+},
+subtle: {
+  opacity: 0.75,
+  fontSize: 13
+},
+titleLine: {
+  marginBottom: 4
+},
+notes: {
+  marginTop: 8,
+  fontSize: 13,
+  opacity: 0.9
+},
+typeBadge: {
+  display: "inline-block",
+  padding: "2px 7px",
+  borderRadius: 999,
+  background: "rgba(0, 212, 255, 0.16)",
+  color: "#06344A",
+  fontSize: 12,
+  fontWeight: 800,
+  textTransform: "uppercase"
+},
+statusBadge: {
+  display: "inline-block",
+  padding: "2px 7px",
+  borderRadius: 999,
+  background: "rgba(0,0,0,0.08)",
+  color: "#263238",
+  fontSize: 12,
+  fontWeight: 700,
+  textTransform: "uppercase"
+},
+detailGrid: {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "4px 10px",
+  marginTop: 8,
+  fontSize: 13,
+  opacity: 0.9
+},
+cancelledNote: {
+  marginTop: 10,
+  padding: "7px 9px",
+  borderRadius: 8,
+  background: "rgba(255,0,0,0.08)",
+  color: "rgba(150,0,0,0.95)",
+  fontSize: 13,
+  fontWeight: 700
+},
   bannerWarn: {
     padding: 12,
     borderRadius: 10,
