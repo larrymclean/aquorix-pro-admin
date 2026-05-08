@@ -295,15 +295,17 @@ export default function SchedulePage() {
 
             <div style={styles.dayList}>
               {map[date].map((s) => {
-                const isCancelling = cancellingId === Number(s.session_id);
+                const rowKey = (s as any).unified_id || s.session_id;
+                const isDiveSession = Boolean(s.session_id);
+                const isCancelling = isDiveSession && cancellingId === Number(s.session_id);
 
                 return (
-                  <div key={s.session_id} style={styles.sessionRow}>
+                  <div key={rowKey} style={styles.sessionRow}>
                     <div style={styles.timeCol}>
                       <div>
                         <strong>{s.start_time}</strong>
                       </div>
-                      <div style={styles.subtle}>Meet {s.meet_time}</div>
+                      <div style={styles.subtle}>Meet {s.meet_time || "—"}</div>
                     </div>
 
                     <div style={styles.mainCol}>
@@ -318,25 +320,31 @@ export default function SchedulePage() {
                     </div>
 
                     <div style={styles.idCol}>
-                      <div style={styles.subtle}>#{s.session_id}</div>
+                      <div style={styles.subtle}>
+                        {(s as any).unified_id || `#${s.session_id}`}
+                      </div>
 
-                      <button
-                        onClick={() => handleCancel(Number(s.session_id))}
-                        disabled={isCancelling}
-                        style={{
-                          marginTop: 8,
-                          padding: "6px 10px",
-                          borderRadius: 8,
-                          cursor: isCancelling ? "not-allowed" : "pointer",
-                          border: "1px solid rgba(255,0,0,0.35)",
-                          background: "rgba(255,0,0,0.10)",
-                          color: "rgba(180,0,0,0.95)",
-                          fontWeight: 700,
-                          fontSize: 12
-                        }}
-                      >
-                        {isCancelling ? "Cancelling…" : "Cancel"}
-                      </button>
+                      {isDiveSession ? (
+                        <button
+                          onClick={() => handleCancel(Number(s.session_id))}
+                          disabled={isCancelling}
+                          style={{
+                            marginTop: 8,
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            cursor: isCancelling ? "not-allowed" : "pointer",
+                            border: "1px solid rgba(255,0,0,0.35)",
+                            background: "rgba(255,0,0,0.10)",
+                            color: "rgba(180,0,0,0.95)",
+                            fontWeight: 700,
+                            fontSize: 12
+                          }}
+                        >
+                          {isCancelling ? "Cancelling…" : "Cancel"}
+                        </button>
+                      ) : (
+                        <div style={{ ...styles.subtle, marginTop: 8 }}>Course inventory</div>
+                      )}
                     </div>
                   </div>
                 );
