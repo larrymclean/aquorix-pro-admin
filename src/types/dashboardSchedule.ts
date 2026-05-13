@@ -54,6 +54,7 @@ export type DashboardScheduleSession = {
   session_date: string;
   start_time: string;
   meet_time: string | null;
+  meet_location?: string | null;
   session_type: string;
   notes?: string | null;
   vessel_name?: string | null;

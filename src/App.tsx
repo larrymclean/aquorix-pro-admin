@@ -33,6 +33,8 @@ import SchedulePage from './features/dashboard/pages/SchedulePage';
 import BookingsPage from './features/dashboard/pages/BookingsPage';
 import BookingDetailPage from './features/dashboard/pages/BookingDetailPage';
 import CoursesPage from './features/dashboard/pages/CoursesPage';
+import ProfilePage from './features/dashboard/pages/ProfilePage';
+import SettingsPage from './features/dashboard/pages/SettingsPage';
 import OpsBoardApp from './features/ops-board/OpsBoardApp';
 
 import AuthCallback from './pages/AuthCallback';
@@ -97,6 +99,8 @@ function App() {
           <Route path="bookings" element={<BookingsPage />} />
           <Route path="bookings/:bookingId" element={<BookingDetailPage />} />
           <Route path="courses" element={<CoursesPage />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
 
         {/* Not Authorized */}

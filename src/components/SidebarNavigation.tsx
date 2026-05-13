@@ -39,6 +39,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   CircleDot,
+  Settings,
 } from 'lucide-react';
 
 import type { UiMode, Permissions, NavItem } from '../config/navigation';
@@ -59,7 +60,14 @@ export type SidebarNavigationProps = {
 type ResolvedItem = NavItem & { isDisabled?: boolean; reason?: string };
 
 function isActivePath(currentPath: string, itemPath: string) {
-  // MVP “feels right” behavior: highlight nested pages under a section
+  if (itemPath === '/dashboard') {
+    return currentPath === '/dashboard';
+  }
+
+  if (itemPath === '/admin/overview') {
+    return currentPath === '/admin/overview';
+  }
+
   return currentPath === itemPath || currentPath.startsWith(itemPath + '/');
 }
 
@@ -73,6 +81,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   courses: GraduationCap,
   profile: User,
   commissions: DollarSign,
+  settings: Settings,
 };
 
 function getIcon(iconKey?: string) {

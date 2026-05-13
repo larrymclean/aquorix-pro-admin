@@ -368,6 +368,7 @@ function OpsBoardApp() {
   const [data, setData] = React.useState<OpsBoardApiResponse | null>(null);
   const [meData, setMeData] = React.useState<DevMeResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = React.useState<Date | null>(null);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -404,6 +405,7 @@ function OpsBoardApp() {
         if (isMounted) {
           setData(json);
           setError(null);
+          setLastRefreshedAt(new Date());
         }
       } catch (err) {
         console.error('AQX OPS BOARD API ERROR:', err);
@@ -416,8 +418,13 @@ function OpsBoardApp() {
 
     loadOpsBoardApi();
 
+    const refreshTimer = window.setInterval(() => {
+      loadOpsBoardApi();
+    }, 30000);
+
     return () => {
       isMounted = false;
+      window.clearInterval(refreshTimer);
     };
   }, []);
 
@@ -443,6 +450,10 @@ function OpsBoardApp() {
   const boardDate = formatBoardDate(data.window.start);
   const syncTime = formatSyncTime(data.generated_at, data.operator.timezone);
 
+  const localRefreshTime = lastRefreshedAt
+    ? lastRefreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : 'loading';
+
   return (
     <div className="ops-board">
       <DevIdentityBanner me={meData} data={data} />
@@ -465,7 +476,7 @@ function OpsBoardApp() {
 
       <div className="sync">
         <span className="online-dot"></span>
-        <span>ONLINE | LAST SYNC: {syncTime}</span>
+        <span>LIVE | API SYNC: {syncTime} | LOCAL REFRESH: {localRefreshTime} | AUTO 30s</span>
       </div>
 
       <div className="strip">

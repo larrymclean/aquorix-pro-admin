@@ -33,7 +33,8 @@ export type LegacyScheduleCell = {
   name: string
   entryType: string
   spaceAvail: number
-  sessionId?: string
+  sessionId?: string | null
+  courseRunId?: string | null
   unitPriceMinor?: number | null
   currency?: string | null
 }
@@ -61,7 +62,8 @@ export type ScheduleJson = {
 }
 
 type CanonicalSession = {
-  session_id: string
+  session_id?: string | null
+  course_run_id?: string | null
   session_date: string
   day_of_week: number
   start_time: string
@@ -148,6 +150,7 @@ export async function fetchLegacySchedule(weekStart: string): Promise<ScheduleJs
       entryType: toEntryType(session.session_type),
       spaceAvail: session.capacity_remaining === null ? 0 : Number(session.capacity_remaining),
       sessionId: session.session_id,
+      courseRunId: session.course_run_id,
       unitPriceMinor: session.unit_price_minor,
       currency: session.session_currency,
     }

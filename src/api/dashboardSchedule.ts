@@ -122,3 +122,124 @@ export async function cancelDashboardSession(session_id: number) {
 
   return json;
 }
+
+/* ================================
+   P10.10 — WEEKLY SCHEDULE PATTERNS
+================================ */
+
+export async function getDashboardSchedulePatterns() {
+  const token = await getAccessToken();
+
+  const res = await fetch(`${DASHBOARD_BASE}/schedule/patterns`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json?.ok === false) {
+    throw new Error(json?.message || "Load schedule patterns failed");
+  }
+
+  return json;
+}
+
+export async function createDashboardSchedulePattern(payload: {
+  weekday: number;
+  start_time: string;
+  meet_time?: string | null;
+  dive_site_id: number;
+  session_type: string;
+  vessel_id?: number | null;
+  lead_guide_id?: number | null;
+  default_capacity?: number | null;
+  price_per_diver?: string | number | null;
+}) {
+  const token = await getAccessToken();
+
+  const res = await fetch(`${DASHBOARD_BASE}/schedule/patterns`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json?.ok === false) {
+    throw new Error(json?.message || "Create schedule pattern failed");
+  }
+
+  return json;
+}
+
+export async function generateDashboardScheduleFromPatterns(payload: {
+  start_date: string;
+  end_date: string;
+}) {
+  const token = await getAccessToken();
+
+  const res = await fetch(`${DASHBOARD_BASE}/schedule/patterns/generate`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json?.ok === false) {
+    throw new Error(json?.message || "Generate schedule from patterns failed");
+  }
+
+  return json;
+}
+
+export async function deleteDashboardSession(session_id: number) {
+  const token = await getAccessToken();
+
+  const res = await fetch(
+    `${DASHBOARD_BASE}/schedule/sessions/${session_id}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json?.ok === false) {
+    throw new Error(json?.message || "Delete session failed");
+  }
+
+  return json;
+}
+
+export async function getDashboardSchedulePatternLookups() {
+  const token = await getAccessToken();
+
+  const res = await fetch(`${DASHBOARD_BASE}/schedule/pattern-lookups`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  const json = await res.json().catch(() => ({}));
+
+  if (!res.ok || json?.ok === false) {
+    throw new Error(json?.message || "Load schedule pattern lookups failed");
+  }
+
+  return json;
+}

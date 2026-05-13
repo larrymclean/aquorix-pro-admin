@@ -42,13 +42,85 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useDashboardSchedule } from "../../../hooks/useDashboardSchedule";
 import type { DashboardScheduleSession } from "../../../types/dashboardSchedule";
-import { createDashboardSession, cancelDashboardSession } from "../../../api/dashboardSchedule";
+import {
+  createDashboardSession,
+  cancelDashboardSession,
+  deleteDashboardSession,
+  getDashboardSchedulePatterns,
+  createDashboardSchedulePattern,
+  generateDashboardScheduleFromPatterns,
+  getDashboardSchedulePatternLookups
+} from "../../../api/dashboardSchedule";
 
 function formatMinorPrice(amount: number | null | undefined, currency: string | null | undefined) {
   if (amount === null || amount === undefined || !currency) return "Price TBD";
 
   const divisor = currency === "JOD" ? 1000 : 100;
   return `${(amount / divisor).toFixed(currency === "JOD" ? 3 : 2)} ${currency}`;
+}
+
+function shortTime(value: string | null | undefined) {
+  if (!value) return "—";
+  return String(value).slice(0, 5);
+}
+
+function weekdayFromYmd(value: string) {
+  const date = new Date(`${value}T12:00:00`);
+  return date.toLocaleDateString("en-US", { weekday: "long" });
+}
+
+function weekdayLabel(value: number | string | null | undefined) {
+  const n = Number(value);
+  const labels: Record<number, string> = {
+    1: "Monday",
+    2: "Tuesday",
+    3: "Wednesday",
+    4: "Thursday",
+    5: "Friday",
+    6: "Saturday",
+    7: "Sunday"
+  };
+
+  return labels[n] || "Every day";
+}
+
+const TEMPLATE_TIME_OPTIONS = [
+  "06:00", "06:30",
+  "07:00", "07:30",
+  "08:00", "08:30",
+  "09:00", "09:30",
+  "10:00", "10:30",
+  "11:00", "11:30",
+  "12:00", "12:30",
+  "13:00", "13:30",
+  "14:00", "14:30",
+  "15:00", "15:30",
+  "16:00", "16:30",
+  "17:00", "17:30",
+  "18:00", "18:30",
+  "19:00", "19:30",
+  "20:00", "20:30",
+  "21:00"
+];
+
+function subtractThirtyMinutes(time: string) {
+  const [hoursRaw, minutesRaw] = time.split(":");
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return time;
+
+  const total = Math.max(0, hours * 60 + minutes - 30);
+  const newHours = Math.floor(total / 60);
+  const newMinutes = total % 60;
+
+  return `${String(newHours).padStart(2, "0")}:${String(newMinutes).padStart(2, "0")}`;
+}
+
+function sessionTypeLabel(value: string | null | undefined) {
+  if (value === "shore") return "Shore dive";
+  if (value === "boat") return "Boat dive";
+  return value || "Type TBD";
 }
 
 function statusLabel(value: string | null | undefined) {
@@ -118,6 +190,42 @@ export default function SchedulePage() {
 
   const [isCreating, setIsCreating] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [patterns, setPatterns] = useState<any[]>([]);
+  const [patternsLoading, setPatternsLoading] = useState(false);
+  const [patternLookups, setPatternLookups] = useState<any>({
+    dive_sites: [],
+    vessels: [],
+    guides: []
+  });
+  const [isCreatingPattern, setIsCreatingPattern] = useState(false);
+  const [isGeneratingFromPatterns, setIsGeneratingFromPatterns] = useState(false);
+
+  const [scheduleView, setScheduleView] = useState<"schedule" | "template">("schedule");
+
+  const [showCreateSessionForm, setShowCreateSessionForm] = useState(false);
+  const [sessionForm, setSessionForm] = useState({
+    session_date: "",
+    start_time: "08:30",
+    meet_time: "08:00",
+    dive_site_id: "",
+    session_type: "shore",
+    vessel_id: ""
+  });
+
+  const [templateForm, setTemplateForm] = useState({
+    template_scope: "weekly",
+    weekday: "1",
+    start_time: "08:30",
+    meet_time: "08:00",
+    meet_location: "Blue Current Dive Shop",
+    dive_site_id: "",
+    session_type: "shore",
+    vessel_id: "",
+    lead_guide_id: "",
+    default_capacity: "10",
+    price_per_diver: "30.000"
+  });
 
   const scheduleData = (state as any).data as any;
 
@@ -138,33 +246,159 @@ export default function SchedulePage() {
     return groupByDate(scheduleData.sessions);
   }, [scheduleData]);
 
-  async function handleTestCreate() {
+    async function refreshPatterns() {
+    setPatternsLoading(true);
+
+    try {
+      const json = await getDashboardSchedulePatterns();
+      setPatterns(Array.isArray(json.patterns) ? json.patterns : []);
+    } catch (err: any) {
+      alert(err?.message || "Load weekly templates failed");
+    } finally {
+      setPatternsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    async function loadScheduleTemplateData() {
+      await refreshPatterns();
+
+      try {
+        const json = await getDashboardSchedulePatternLookups();
+        setPatternLookups({
+          dive_sites: Array.isArray(json.dive_sites) ? json.dive_sites : [],
+          vessels: Array.isArray(json.vessels) ? json.vessels : [],
+          guides: Array.isArray(json.guides) ? json.guides : []
+        });
+      } catch (err: any) {
+        alert(err?.message || "Load schedule template lookups failed");
+      }
+    }
+
+    void loadScheduleTemplateData();
+  }, []);
+
+  async function handleCreateBlueCurrentPattern() {
+    if (isCreatingPattern) return;
+
+    if (!templateForm.dive_site_id) {
+      alert("Choose a dive site before creating a template row.");
+      return;
+    }
+
+    if (!templateForm.start_time || !templateForm.meet_time || !templateForm.meet_location.trim()) {
+      alert("Start time, meet time, and meet location are required.");
+      return;
+    }
+
+    setIsCreatingPattern(true);
+
+    try {
+      await createDashboardSchedulePattern({
+        template_scope: templateForm.template_scope,
+        weekday: Number(templateForm.weekday),
+        start_time: templateForm.start_time,
+        meet_time: templateForm.meet_time,
+        meet_location: templateForm.meet_location.trim(),
+        dive_site_id: Number(templateForm.dive_site_id),
+        session_type: templateForm.session_type,
+        vessel_id: templateForm.vessel_id ? Number(templateForm.vessel_id) : null,
+        lead_guide_id: templateForm.lead_guide_id ? Number(templateForm.lead_guide_id) : null,
+        default_capacity: templateForm.default_capacity ? Number(templateForm.default_capacity) : null,
+        price_per_diver: templateForm.price_per_diver || null,
+      } as any);
+
+      await refreshPatterns();
+    } catch (err: any) {
+      alert(err?.message || "Create weekly template failed");
+    } finally {
+      setIsCreatingPattern(false);
+    }
+  }
+
+  async function handleGenerateWeekFromPatterns() {
+    if (isGeneratingFromPatterns) return;
+
+    const start = weekStart || scheduleData?.week?.start;
+    const end = scheduleData?.week?.end;
+
+    if (!start || !end) {
+      alert("Week not loaded yet.");
+      return;
+    }
+
+    const ok = window.confirm(`Generate sessions from active weekly templates for ${start} to ${end}?`);
+    if (!ok) return;
+
+    setIsGeneratingFromPatterns(true);
+
+    try {
+      await generateDashboardScheduleFromPatterns({
+        start_date: start,
+        end_date: end,
+      });
+
+      refresh();
+    } catch (err: any) {
+      alert(err?.message || "Generate schedule from templates failed");
+    } finally {
+      setIsGeneratingFromPatterns(false);
+    }
+  }
+  
+  async function handleCreateDiveSession() {
     if (isCreating) return;
+
+    const date = sessionForm.session_date || scheduleData?.week?.start;
+
+    if (!date) {
+      alert("Week not loaded yet.");
+      return;
+    }
+
+    if (!sessionForm.dive_site_id) {
+      alert("Choose a dive site before creating a session.");
+      return;
+    }
+
     setIsCreating(true);
 
     try {
-      const wk = scheduleData?.week?.start;
-
-      if (!wk) {
-        alert("Week not loaded yet.");
-        return;
-      }
-
       await createDashboardSession({
         itinerary_id: 1,
         team_id: 1,
-        dive_site_id: 67,
-        dive_datetime: `${wk}T10:00:00Z`,
-        meet_time: `${wk}T09:30:00Z`,
-        session_type: "shore",
-        notes: `Test session ${new Date().toISOString()}`
+        dive_site_id: Number(sessionForm.dive_site_id),
+        dive_datetime: `${date}T${sessionForm.start_time}:00`,
+        meet_time: `${date}T${sessionForm.meet_time}:00`,
+        session_type: sessionForm.session_type,
+        vessel_id: sessionForm.vessel_id ? Number(sessionForm.vessel_id) : undefined,
+        notes: `Dashboard-created individual dive session ${new Date().toISOString()}`
       });
 
+      setShowCreateSessionForm(false);
       refresh();
     } catch (err: any) {
       alert(err?.message || "Create failed");
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleDelete(session_id: number) {
+    if (deletingId !== null) return;
+
+    const ok = window.confirm(`Delete session #${session_id}? This is only allowed when there are no booking dependencies.`);
+    if (!ok) return;
+
+    setDeletingId(session_id);
+
+    try {
+      await deleteDashboardSession(session_id);
+      refresh();
+    } catch (err: any) {
+      alert(err?.message || "Delete failed");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -216,9 +450,27 @@ export default function SchedulePage() {
 
       {state.status === "error" ? <ErrorBanner error={(state as any).error} /> : null}
 
+            <div style={styles.scheduleTabs}>
+        <button
+          type="button"
+          onClick={() => setScheduleView("schedule")}
+          style={scheduleView === "schedule" ? styles.scheduleTabActive : styles.scheduleTab}
+        >
+          Operational Schedule
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setScheduleView("template")}
+          style={scheduleView === "template" ? styles.scheduleTabActive : styles.scheduleTab}
+        >
+          Weekly Templates
+        </button>
+      </div>
+
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 12 }}>
         <button
-          onClick={handleTestCreate}
+          onClick={() => setShowCreateSessionForm((value) => !value)}
           disabled={isCreating}
           style={{
             padding: "10px 14px",
@@ -230,7 +482,7 @@ export default function SchedulePage() {
             fontWeight: 700
           }}
         >
-          {isCreating ? "Creating…" : "+ Create Test Session"}
+          {showCreateSessionForm ? "Close Create Form" : "+ Create Dive Session"}
         </button>
 
         {weekStart && (
@@ -255,10 +507,12 @@ export default function SchedulePage() {
                 borderRadius: 8,
                 border: "1px solid rgba(0,0,0,0.15)",
                 cursor: isAtFloor ? "not-allowed" : "pointer",
-                opacity: isAtFloor ? 0.6 : 1
+                opacity: isAtFloor ? 0.85 : 1,
+                background: isAtFloor ? "#eeeeee" : "#ffffff",
+                color: isAtFloor ? "#777777" : "#111111"
               }}
             >
-              ← Prev 7 Days
+              ← Previous Week
             </button>
 
             <button
@@ -276,7 +530,7 @@ export default function SchedulePage() {
                 cursor: "pointer"
               }}
             >
-              Next 7 Days →
+              Next Week →
             </button>
           </>
         )}
@@ -286,6 +540,267 @@ export default function SchedulePage() {
         ) : null}
       </div>
 
+      {scheduleView === "schedule" && showCreateSessionForm ? (
+        <div style={styles.createSessionPanel}>
+          <div>
+            <h2 style={styles.h2}>Create Dive Session</h2>
+            <div style={styles.templateHelp}>
+              Add an individual dive to the selected operational week.
+            </div>
+          </div>
+
+          <div style={styles.templateForm}>
+            <label style={styles.templateField}>
+              <span>Date</span>
+              <input
+                type="date"
+                value={sessionForm.session_date || scheduleData?.week?.start || ""}
+                onChange={(e) => setSessionForm({ ...sessionForm, session_date: e.target.value })}
+              />
+            </label>
+
+            <label style={styles.templateField}>
+              <span>Start time</span>
+              <select
+                value={sessionForm.start_time}
+                onChange={(e) => {
+                  const nextStartTime = e.target.value;
+                  setSessionForm({
+                    ...sessionForm,
+                    start_time: nextStartTime,
+                    meet_time: subtractThirtyMinutes(nextStartTime)
+                  });
+                }}
+              >
+                {TEMPLATE_TIME_OPTIONS.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+            </label>
+
+            <label style={styles.templateField}>
+              <span>Meet time</span>
+              <select
+                value={sessionForm.meet_time}
+                onChange={(e) => setSessionForm({ ...sessionForm, meet_time: e.target.value })}
+              >
+                {TEMPLATE_TIME_OPTIONS.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+            </label>
+
+            <label style={styles.templateField}>
+              <span>Dive site</span>
+              <select
+                value={sessionForm.dive_site_id}
+                onChange={(e) => setSessionForm({ ...sessionForm, dive_site_id: e.target.value })}
+              >
+                <option value="">Choose dive site</option>
+                {patternLookups.dive_sites.map((site: any) => (
+                  <option key={site.dive_site_id} value={site.dive_site_id}>{site.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label style={styles.templateField}>
+              <span>Type</span>
+              <select
+                value={sessionForm.session_type}
+                onChange={(e) => setSessionForm({ ...sessionForm, session_type: e.target.value })}
+              >
+                <option value="shore">Shore dive</option>
+                <option value="boat">Boat dive</option>
+              </select>
+            </label>
+
+            <label style={styles.templateField}>
+              <span>Vessel</span>
+              <select
+                value={sessionForm.vessel_id}
+                onChange={(e) => setSessionForm({ ...sessionForm, vessel_id: e.target.value })}
+              >
+                <option value="">No vessel / TBD</option>
+                {patternLookups.vessels.map((vessel: any) => (
+                  <option key={vessel.vessel_id} value={vessel.vessel_id}>{vessel.name}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div style={styles.templateActions}>
+            <button
+              onClick={handleCreateDiveSession}
+              disabled={isCreating}
+              style={styles.templatePrimaryButton}
+            >
+              {isCreating ? "Creating Session…" : "Create Session"}
+            </button>
+
+            <button
+              onClick={() => setShowCreateSessionForm(false)}
+              type="button"
+              style={styles.deleteButton}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {scheduleView === "template" ? (
+          <div style={styles.templatePanel}>
+        <div style={styles.templatePanelHeader}>
+          <div>
+            <h2 style={styles.h2}>Weekly Template</h2>
+            <div style={styles.templateHelp}>
+              Defines the normal schedule rhythm. Generated sessions become real operational inventory.
+            </div>
+          </div>
+
+          <div style={styles.templateHelp}>
+            {patternsLoading
+              ? "Loading templates…"
+              : `${patterns.length} template row(s) • ${patternLookups.dive_sites.length} sites • ${patternLookups.vessels.length} vessels • ${patternLookups.guides.length} guides`}
+          </div>
+        </div>
+
+        <div style={styles.templateForm}>
+          <label style={styles.templateField}>
+            <span>Day</span>
+            <select
+              value={templateForm.weekday}
+              onChange={(e) => setTemplateForm({ ...templateForm, weekday: e.target.value })}
+            >
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+              <option value="7">Sunday</option>
+            </select>
+          </label>
+
+          <label style={styles.templateField}>
+            <span>Start time</span>
+              <select
+                value={templateForm.start_time}
+                onChange={(e) => {
+                  const nextStartTime = e.target.value;
+                  setTemplateForm({
+                    ...templateForm,
+                    start_time: nextStartTime,
+                    meet_time: subtractThirtyMinutes(nextStartTime)
+                  });
+                }}
+              >
+              {TEMPLATE_TIME_OPTIONS.map((time) => (
+                <option key={time} value={time}>{time}</option>
+              ))}
+            </select>
+          </label>
+
+          <label style={styles.templateField}>
+            <span>Meet time</span>
+              <select value={templateForm.meet_time} onChange={(e) => setTemplateForm({ ...templateForm, meet_time: e.target.value })}>
+              {TEMPLATE_TIME_OPTIONS.map((time) => (
+                <option key={time} value={time}>{time}</option>
+              ))}
+            </select>
+          </label>
+
+          <label style={styles.templateField}>
+            <span>Meet location</span>
+            <select
+              value={templateForm.meet_location}
+              onChange={(e) => setTemplateForm({ ...templateForm, meet_location: e.target.value })}
+            >
+              <option value="Dive Center">Dive Center</option>
+              <option value="Marina Dock">Marina Dock</option>
+              <option value="Hotel pickup">Hotel pickup</option>
+              <option value="TBD">TBD</option>
+            </select>
+          </label>
+
+          <label style={styles.templateField}>
+            <span>Dive site</span>
+            <select
+              value={templateForm.dive_site_id}
+              onChange={(e) => setTemplateForm({ ...templateForm, dive_site_id: e.target.value })}
+            >
+              <option value="">Choose dive site</option>
+              {patternLookups.dive_sites.map((site: any) => (
+                <option key={site.dive_site_id} value={site.dive_site_id}>{site.name}</option>
+              ))}
+            </select>
+          </label>
+
+          <label style={styles.templateField}>
+            <span>Type</span>
+            <select value={templateForm.session_type} onChange={(e) => setTemplateForm({ ...templateForm, session_type: e.target.value })}>
+              <option value="shore">Shore dive</option>
+              <option value="boat">Boat dive</option>
+            </select>
+          </label>
+        </div>
+
+        <div style={styles.templateActions}>
+          <button
+            onClick={handleCreateBlueCurrentPattern}
+            disabled={isCreatingPattern}
+            style={styles.templatePrimaryButton}
+          >
+            {isCreatingPattern ? "Adding Row…" : "+ Add Template Row"}
+          </button>
+
+          <button
+            onClick={handleGenerateWeekFromPatterns}
+            disabled={isGeneratingFromPatterns}
+            style={styles.templateSecondaryButton}
+          >
+            {isGeneratingFromPatterns ? "Generating…" : "Generate This Week"}
+          </button>
+        </div>
+
+        {patterns.length === 0 ? (
+          <div style={styles.templateEmpty}>
+            No template rows yet. Fill out the fields above, then click “+ Add Template Row.”
+          </div>
+        ) : (
+          <div style={styles.templateRows}>
+            {patterns.map((p) => (
+              <div key={p.pattern_id} style={styles.templateRow}>
+                <div>
+                  <div style={styles.templateTitle}>
+                    {p.template_scope === "daily" ? "Daily" : "Weekly"} • {p.template_scope === "daily" ? "Every day" : weekdayLabel(p.weekday)} • {shortTime(p.start_time)} • {p.dive_site_name || `Site #${p.dive_site_id}`}
+                  </div>
+                  <div style={styles.templateSubline}>
+                    <div>
+                      Meet: {shortTime(p.meet_time)}
+                      {p.meet_location ? ` at ${p.meet_location}` : " at Location TBD"}
+                    </div>
+                    <div>
+                      Type: {sessionTypeLabel(p.session_type)}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={styles.templateMeta}>
+                  <span>{p.vessel_name || "Vessel TBD"}</span>
+                  <span>Guide {p.lead_guide_id || "TBD"}</span>
+                  <span>Cap {p.default_capacity || "default"}</span>
+                  <span>{p.price_per_diver ? `${p.price_per_diver} JOD` : "Price TBD"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      ) : null}
+
+      {scheduleView === "schedule" ? (
+        <>
       <div style={styles.meta}>
         <div>
           <strong>Operator:</strong> {scheduleData.operator_id}
@@ -299,11 +814,46 @@ export default function SchedulePage() {
       </div>
 
       {dates.length === 0 ? (
-        <div style={styles.card}>No sessions scheduled for this week.</div>
+        <div
+          style={{
+            ...styles.card,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            alignItems: "flex-start"
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 700 }}>
+            No sessions scheduled for this week.
+          </div>
+
+          <div style={{ opacity: 0.8, lineHeight: 1.5 }}>
+            Generate real operational sessions from your active weekly templates.
+          </div>
+
+          <button
+            onClick={handleGenerateWeekFromPatterns}
+            disabled={isGeneratingFromPatterns}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              cursor: isGeneratingFromPatterns ? "not-allowed" : "pointer",
+              border: "1px solid rgba(0,0,0,0.10)",
+              background: "#1B4D6F",
+              color: "#F5F6F5",
+              fontWeight: 700,
+              opacity: isGeneratingFromPatterns ? 0.7 : 1
+            }}
+          >
+            {isGeneratingFromPatterns
+              ? "Generating Sessions…"
+              : "Generate Sessions for This Week"}
+          </button>
+        </div>
       ) : (
         dates.map((date) => (
           <div key={date} style={styles.dayBlock}>
-            <div style={styles.dayHeader}>{date}</div>
+            <div style={styles.dayHeader}>{weekdayFromYmd(date)} • {date}</div>
 
             <div style={styles.dayList}>
               {map[date].map((s) => {
@@ -321,7 +871,15 @@ export default function SchedulePage() {
                   >
                     <div style={styles.timeRail}>
                       <div style={styles.startTime}>{s.start_time}</div>
-                      <div style={styles.meetTime}>Meet {s.meet_time || "—"}</div>
+                    <div style={styles.meetTime}>
+                      Meet {s.meet_time || "—"}
+                    </div>
+
+                    {(s as any).meet_location ? (
+                      <div style={styles.meetLocation}>
+                        {(s as any).meet_location}
+                      </div>
+                    ) : null}
                     </div>
 
                     <div style={styles.opsContent}>
@@ -379,13 +937,23 @@ export default function SchedulePage() {
                       </div>
 
                       {isDiveSession ? (
-                        <button
-                          onClick={() => handleCancel(Number(s.session_id))}
-                          disabled={isCancelling}
-                          style={styles.cancelButton}
-                        >
-                          {isCancelling ? "Cancelling…" : "Cancel"}
-                        </button>
+                        <>
+                          <button
+                            onClick={() => handleCancel(Number(s.session_id))}
+                            disabled={isCancelling}
+                            style={styles.cancelButton}
+                          >
+                            {isCancelling ? "Cancelling…" : "Cancel"}
+                          </button>
+
+                          <button
+                            onClick={() => handleDelete(Number(s.session_id))}
+                            disabled={deletingId === Number(s.session_id)}
+                            style={styles.deleteButton}
+                          >
+                            {deletingId === Number(s.session_id) ? "Deleting…" : "Delete"}
+                          </button>
+                        </>
                       ) : (
                         <div style={styles.courseInventoryLabel}>Course inventory</div>
                       )}
@@ -396,7 +964,9 @@ export default function SchedulePage() {
             </div>
           </div>
         ))
-      )}
+            )}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -410,6 +980,132 @@ const styles: Record<string, React.CSSProperties> = {
   h1: {
     fontSize: 22,
     margin: "8px 0 12px"
+  },
+  h2: {
+    fontSize: 18,
+    margin: "0 0 4px"
+  },
+    scheduleTabs: {
+    display: "flex",
+    gap: 8,
+    marginBottom: 12
+  },
+  scheduleTab: {
+    padding: "9px 14px",
+    borderRadius: 999,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "#ffffff",
+    color: "#1f2937",
+    fontWeight: 800,
+    cursor: "pointer"
+  },
+  scheduleTabActive: {
+    padding: "9px 14px",
+    borderRadius: 999,
+    border: "1px solid rgba(0,0,0,0.12)",
+    background: "#1B4D6F",
+    color: "#F5F6F5",
+    fontWeight: 800,
+    cursor: "pointer"
+  },
+  createSessionPanel: {
+    padding: 14,
+    border: "1px solid rgba(0,0,0,0.08)",
+    borderRadius: 12,
+    background: "#ffffff",
+    marginBottom: 14,
+    boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+  },
+  templatePanel: {
+    padding: 14,
+    border: "1px solid rgba(0,0,0,0.08)",
+    borderRadius: 12,
+    background: "rgba(0, 212, 255, 0.04)",
+    marginBottom: 14
+  },
+  templatePanelHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    alignItems: "flex-start",
+    marginBottom: 12
+  },
+  templateHelp: {
+    fontSize: 13,
+    opacity: 0.72
+  },
+  templateEmpty: {
+    padding: 12,
+    borderRadius: 10,
+    background: "#ffffff",
+    border: "1px dashed rgba(0,0,0,0.18)",
+    fontSize: 13,
+    opacity: 0.8
+  },
+  templateForm: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+    gap: 8,
+    marginBottom: 12
+  },
+    templateField: {
+    display: "grid",
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 800,
+    textTransform: "uppercase",
+    opacity: 0.85
+  },
+    templateActions: {
+    display: "flex",
+    gap: 10,
+    alignItems: "center",
+    marginBottom: 12
+  },
+  templatePrimaryButton: {
+    padding: "10px 14px",
+    borderRadius: 10,
+    cursor: "pointer",
+    border: "1px solid rgba(0,0,0,0.10)",
+    background: "#1B4D6F",
+    color: "#F5F6F5",
+    fontWeight: 700
+  },
+  templateSecondaryButton: {
+    padding: "10px 14px",
+    borderRadius: 10,
+    cursor: "pointer",
+    border: "1px solid rgba(0,0,0,0.10)",
+    background: "#0A6C9B",
+    color: "#F5F6F5",
+    fontWeight: 700
+  },
+  templateRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: 12,
+    borderRadius: 10,
+    background: "#ffffff",
+    border: "1px solid rgba(0,0,0,0.08)"
+  },
+  templateTitle: {
+    fontSize: 15,
+    fontWeight: 800
+  },
+  templateSubline: {
+    fontSize: 13,
+    opacity: 0.72,
+    marginTop: 3
+  },
+  templateMeta: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "flex-end",
+    fontSize: 12,
+    fontWeight: 700,
+    opacity: 0.78
   },
   meta: {
     display: "flex",
@@ -472,6 +1168,12 @@ meetTime: {
   fontSize: 12,
   opacity: 0.7
 },
+meetLocation: {
+  marginTop: 4,
+  fontSize: 12,
+  fontWeight: 700,
+  opacity: 0.85
+},
 opsContent: {
   minWidth: 0
 },
@@ -527,6 +1229,17 @@ cancelButton: {
   border: "1px solid rgba(255,0,0,0.35)",
   background: "#fff5f5",
   color: "rgba(180,0,0,0.95)",
+  fontWeight: 700,
+  fontSize: 12
+},
+deleteButton: {
+  marginTop: 8,
+  padding: "8px 12px",
+  borderRadius: 10,
+  cursor: "pointer",
+  border: "1px solid rgba(0,0,0,0.25)",
+  background: "#ffffff",
+  color: "rgba(40,40,40,0.95)",
   fontWeight: 700,
   fontSize: 12
 },

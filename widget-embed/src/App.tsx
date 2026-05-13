@@ -442,7 +442,8 @@ export default function App({ destinationTimeZone }: AppProps) {
         ...prev,
         {
           id,
-          sessionId: cell.sessionId || id,
+          sessionId: cell.sessionId || null,
+          courseRunId: cell.courseRunId || null,
           unitPriceMinor: cell.unitPriceMinor || 4500,
           currency: cell.currency || "USD",
           kind,
@@ -491,7 +492,8 @@ export default function App({ destinationTimeZone }: AppProps) {
       createdAtIso: new Date().toISOString(),
       chargeableItems: available.map((x) => ({
         itemId: x.id,
-        sessionId: x.sessionId,
+        sessionId: x.sessionId || null,
+        courseRunId: x.courseRunId || null,
         sessionKey: `${x.isoDate}__${x.time}__${x.name}`.replace(/\s+/g, "_").toLowerCase(),
         soldItemLabel: `${x.isoDate} ${x.time} ${x.name} (${x.entryType})`,
         day: x.day,
@@ -507,7 +509,8 @@ export default function App({ destinationTimeZone }: AppProps) {
       })),
       waitlistItems: waitlist.map((x) => ({
         itemId: x.id,
-        sessionId: x.sessionId,
+        sessionId: x.sessionId || null,
+        courseRunId: x.courseRunId || null,
         sessionKey: `${x.isoDate}__${x.time}__${x.name}`.replace(/\s+/g, "_").toLowerCase(),
         soldItemLabel: `${x.isoDate} ${x.time} ${x.name} (${x.entryType})`,
         day: x.day,

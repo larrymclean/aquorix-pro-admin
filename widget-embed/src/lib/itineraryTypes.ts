@@ -6,9 +6,9 @@
 
   Author: ChatGPT (Lead) + Larry McLean
   Created: 2026-03-06
-  Version: 1.2.0
+  Version: 1.3.0
 
-  Last Updated: 2026-03-09
+  Last Updated: 2026-05-10
   Status: ACTIVE
 
   Change Log (append-only):
@@ -23,11 +23,15 @@
       - Add canonical session identity and pricing fields to itinerary items.
       - Add sessionId to checkout payload item contracts.
       - Preserve sessionKey as a secondary display/debug field only.
+    - 2026-05-10 - v1.3.0:
+      - Add courseRunId support so widget checkout payload can carry either dive_session or course_run inventory identity.
+      - Preserve sessionId as optional for dive sessions.
 */
 
 export type ItineraryItemBase = {
   id: string
-  sessionId: string
+  sessionId?: string | null
+  courseRunId?: string | null
   unitPriceMinor: number
   currency: string
   day: string
@@ -51,7 +55,8 @@ export type ItineraryItem = ItineraryAvailableItem | ItineraryWaitlistItem
 
 export type CheckoutChargeableItem = {
   itemId: string
-  sessionId: string
+  sessionId?: string | null
+  courseRunId?: string | null
   sessionKey: string
   soldItemLabel: string
   day: string
@@ -68,7 +73,8 @@ export type CheckoutChargeableItem = {
 
 export type CheckoutWaitlistItem = {
   itemId: string
-  sessionId: string
+  sessionId?: string | null
+  courseRunId?: string | null
   sessionKey: string
   soldItemLabel: string
   day: string

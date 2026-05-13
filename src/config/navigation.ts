@@ -148,6 +148,13 @@ export const NAV_CONFIG: NavGroup[] = [
         iconKey: 'profile',
         requiredPermissions: ['can_edit_profile'],
       },
+      {
+        label: 'Settings',
+        path: '/dashboard/settings',
+        uiModes: ['pro'],
+        iconKey: 'settings',
+        requiredPermissions: ['can_use_operator_tools'],
+      },
     ],
   },
 
