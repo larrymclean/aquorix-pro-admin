@@ -20,7 +20,7 @@
 
   Author: AQUORIX Team
   Created: 2026-02-14
-  Version: 1.3.3
+  Version: 1.3.4
 
   Change Log:
     - 2026-02-14 - v1.0.0:
@@ -37,11 +37,15 @@
     - 2026-02-17 - v1.3.3:
       - Phase 6: Add weekFloor anchored to backend week.start
       - Phase 6: Prev clamps to weekFloor (not browser today) and disables at floor
+    - 2026-05-14 - v1.3.4:
+      - Wire Operational Schedule rows to shared DashboardSessionCard presentation component.
+      - Preserve existing Cancel/Delete behavior through card action slot.
 */
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useDashboardSchedule } from "../../../hooks/useDashboardSchedule";
 import type { DashboardScheduleSession } from "../../../types/dashboardSchedule";
+import DashboardSessionCard from "../components/DashboardSessionCard";
 import {
   createDashboardSession,
   cancelDashboardSession,
@@ -123,11 +127,6 @@ function sessionTypeLabel(value: string | null | undefined) {
   return value || "Type TBD";
 }
 
-function statusLabel(value: string | null | undefined) {
-  if (!value) return "unknown";
-  return value.replace(/_/g, " ");
-}
-
 function groupByDate(sessions: DashboardScheduleSession[]) {
   const map: Record<string, DashboardScheduleSession[]> = {};
   for (const s of sessions) {
@@ -179,13 +178,9 @@ function ErrorBanner({ error }: { error: any }) {
 }
 
 export default function SchedulePage() {
-  // weekStart = the week_start param we send to backend (YYYY-MM-DD)
   const [weekStart, setWeekStart] = useState<string | null>(null);
-
-  // weekFloor = backend-authoritative anchor for "earliest allowed weekStart"
   const [weekFloor, setWeekFloor] = useState<string | null>(null);
 
-  // SINGLE hook call (do not duplicate)
   const { state, refresh } = useDashboardSchedule(weekStart || undefined);
 
   const [isCreating, setIsCreating] = useState(false);
@@ -200,10 +195,9 @@ export default function SchedulePage() {
   });
   const [isCreatingPattern, setIsCreatingPattern] = useState(false);
   const [isGeneratingFromPatterns, setIsGeneratingFromPatterns] = useState(false);
-
   const [scheduleView, setScheduleView] = useState<"schedule" | "template">("schedule");
-
   const [showCreateSessionForm, setShowCreateSessionForm] = useState(false);
+
   const [sessionForm, setSessionForm] = useState({
     session_date: "",
     start_time: "08:30",
@@ -229,14 +223,10 @@ export default function SchedulePage() {
 
   const scheduleData = (state as any).data as any;
 
-  // ---------------------------------------------------------------------------
-  // Phase 6: Initialize weekStart + weekFloor once, from backend week.start
-  // ---------------------------------------------------------------------------
   useEffect(() => {
     const backendStart: string | undefined = scheduleData?.week?.start;
     if (!backendStart) return;
 
-    // First time we ever see backendStart: lock floor + initialize weekStart
     if (!weekStart) setWeekStart(backendStart);
     if (!weekFloor) setWeekFloor(backendStart);
   }, [scheduleData?.week?.start, weekStart, weekFloor]);
@@ -246,7 +236,7 @@ export default function SchedulePage() {
     return groupByDate(scheduleData.sessions);
   }, [scheduleData]);
 
-    async function refreshPatterns() {
+  async function refreshPatterns() {
     setPatternsLoading(true);
 
     try {
@@ -345,7 +335,7 @@ export default function SchedulePage() {
       setIsGeneratingFromPatterns(false);
     }
   }
-  
+
   async function handleCreateDiveSession() {
     if (isCreating) return;
 
@@ -420,7 +410,6 @@ export default function SchedulePage() {
     }
   }
 
-  // True first-load only
   if (state.status === "loading") {
     return (
       <div style={styles.page}>
@@ -430,7 +419,6 @@ export default function SchedulePage() {
     );
   }
 
-  // If error and no data, stop
   if (state.status === "error" && !scheduleData) {
     return (
       <div style={styles.page}>
@@ -441,7 +429,6 @@ export default function SchedulePage() {
   }
 
   const { dates, map } = grouped;
-
   const isAtFloor = Boolean(weekFloor && weekStart && weekStart <= weekFloor);
 
   return (
@@ -450,7 +437,7 @@ export default function SchedulePage() {
 
       {state.status === "error" ? <ErrorBanner error={(state as any).error} /> : null}
 
-            <div style={styles.scheduleTabs}>
+      <div style={styles.scheduleTabs}>
         <button
           type="button"
           onClick={() => setScheduleView("schedule")}
@@ -649,41 +636,41 @@ export default function SchedulePage() {
       ) : null}
 
       {scheduleView === "template" ? (
-          <div style={styles.templatePanel}>
-        <div style={styles.templatePanelHeader}>
-          <div>
-            <h2 style={styles.h2}>Weekly Template</h2>
+        <div style={styles.templatePanel}>
+          <div style={styles.templatePanelHeader}>
+            <div>
+              <h2 style={styles.h2}>Weekly Template</h2>
+              <div style={styles.templateHelp}>
+                Defines the normal schedule rhythm. Generated sessions become real operational inventory.
+              </div>
+            </div>
+
             <div style={styles.templateHelp}>
-              Defines the normal schedule rhythm. Generated sessions become real operational inventory.
+              {patternsLoading
+                ? "Loading templates…"
+                : `${patterns.length} template row(s) • ${patternLookups.dive_sites.length} sites • ${patternLookups.vessels.length} vessels • ${patternLookups.guides.length} guides`}
             </div>
           </div>
 
-          <div style={styles.templateHelp}>
-            {patternsLoading
-              ? "Loading templates…"
-              : `${patterns.length} template row(s) • ${patternLookups.dive_sites.length} sites • ${patternLookups.vessels.length} vessels • ${patternLookups.guides.length} guides`}
-          </div>
-        </div>
+          <div style={styles.templateForm}>
+            <label style={styles.templateField}>
+              <span>Day</span>
+              <select
+                value={templateForm.weekday}
+                onChange={(e) => setTemplateForm({ ...templateForm, weekday: e.target.value })}
+              >
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+                <option value="7">Sunday</option>
+              </select>
+            </label>
 
-        <div style={styles.templateForm}>
-          <label style={styles.templateField}>
-            <span>Day</span>
-            <select
-              value={templateForm.weekday}
-              onChange={(e) => setTemplateForm({ ...templateForm, weekday: e.target.value })}
-            >
-              <option value="1">Monday</option>
-              <option value="2">Tuesday</option>
-              <option value="3">Wednesday</option>
-              <option value="4">Thursday</option>
-              <option value="5">Friday</option>
-              <option value="6">Saturday</option>
-              <option value="7">Sunday</option>
-            </select>
-          </label>
-
-          <label style={styles.templateField}>
-            <span>Start time</span>
+            <label style={styles.templateField}>
+              <span>Start time</span>
               <select
                 value={templateForm.start_time}
                 onChange={(e) => {
@@ -695,276 +682,209 @@ export default function SchedulePage() {
                   });
                 }}
               >
-              {TEMPLATE_TIME_OPTIONS.map((time) => (
-                <option key={time} value={time}>{time}</option>
-              ))}
-            </select>
-          </label>
+                {TEMPLATE_TIME_OPTIONS.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+            </label>
 
-          <label style={styles.templateField}>
-            <span>Meet time</span>
+            <label style={styles.templateField}>
+              <span>Meet time</span>
               <select value={templateForm.meet_time} onChange={(e) => setTemplateForm({ ...templateForm, meet_time: e.target.value })}>
-              {TEMPLATE_TIME_OPTIONS.map((time) => (
-                <option key={time} value={time}>{time}</option>
-              ))}
-            </select>
-          </label>
+                {TEMPLATE_TIME_OPTIONS.map((time) => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+            </label>
 
-          <label style={styles.templateField}>
-            <span>Meet location</span>
-            <select
-              value={templateForm.meet_location}
-              onChange={(e) => setTemplateForm({ ...templateForm, meet_location: e.target.value })}
-            >
-              <option value="Dive Center">Dive Center</option>
-              <option value="Marina Dock">Marina Dock</option>
-              <option value="Hotel pickup">Hotel pickup</option>
-              <option value="TBD">TBD</option>
-            </select>
-          </label>
+            <label style={styles.templateField}>
+              <span>Meet location</span>
+              <select
+                value={templateForm.meet_location}
+                onChange={(e) => setTemplateForm({ ...templateForm, meet_location: e.target.value })}
+              >
+                <option value="Dive Center">Dive Center</option>
+                <option value="Marina Dock">Marina Dock</option>
+                <option value="Hotel pickup">Hotel pickup</option>
+                <option value="TBD">TBD</option>
+              </select>
+            </label>
 
-          <label style={styles.templateField}>
-            <span>Dive site</span>
-            <select
-              value={templateForm.dive_site_id}
-              onChange={(e) => setTemplateForm({ ...templateForm, dive_site_id: e.target.value })}
-            >
-              <option value="">Choose dive site</option>
-              {patternLookups.dive_sites.map((site: any) => (
-                <option key={site.dive_site_id} value={site.dive_site_id}>{site.name}</option>
-              ))}
-            </select>
-          </label>
+            <label style={styles.templateField}>
+              <span>Dive site</span>
+              <select
+                value={templateForm.dive_site_id}
+                onChange={(e) => setTemplateForm({ ...templateForm, dive_site_id: e.target.value })}
+              >
+                <option value="">Choose dive site</option>
+                {patternLookups.dive_sites.map((site: any) => (
+                  <option key={site.dive_site_id} value={site.dive_site_id}>{site.name}</option>
+                ))}
+              </select>
+            </label>
 
-          <label style={styles.templateField}>
-            <span>Type</span>
-            <select value={templateForm.session_type} onChange={(e) => setTemplateForm({ ...templateForm, session_type: e.target.value })}>
-              <option value="shore">Shore dive</option>
-              <option value="boat">Boat dive</option>
-            </select>
-          </label>
-        </div>
-
-        <div style={styles.templateActions}>
-          <button
-            onClick={handleCreateBlueCurrentPattern}
-            disabled={isCreatingPattern}
-            style={styles.templatePrimaryButton}
-          >
-            {isCreatingPattern ? "Adding Row…" : "+ Add Template Row"}
-          </button>
-
-          <button
-            onClick={handleGenerateWeekFromPatterns}
-            disabled={isGeneratingFromPatterns}
-            style={styles.templateSecondaryButton}
-          >
-            {isGeneratingFromPatterns ? "Generating…" : "Generate This Week"}
-          </button>
-        </div>
-
-        {patterns.length === 0 ? (
-          <div style={styles.templateEmpty}>
-            No template rows yet. Fill out the fields above, then click “+ Add Template Row.”
+            <label style={styles.templateField}>
+              <span>Type</span>
+              <select value={templateForm.session_type} onChange={(e) => setTemplateForm({ ...templateForm, session_type: e.target.value })}>
+                <option value="shore">Shore dive</option>
+                <option value="boat">Boat dive</option>
+              </select>
+            </label>
           </div>
-        ) : (
-          <div style={styles.templateRows}>
-            {patterns.map((p) => (
-              <div key={p.pattern_id} style={styles.templateRow}>
-                <div>
-                  <div style={styles.templateTitle}>
-                    {p.template_scope === "daily" ? "Daily" : "Weekly"} • {p.template_scope === "daily" ? "Every day" : weekdayLabel(p.weekday)} • {shortTime(p.start_time)} • {p.dive_site_name || `Site #${p.dive_site_id}`}
+
+          <div style={styles.templateActions}>
+            <button
+              onClick={handleCreateBlueCurrentPattern}
+              disabled={isCreatingPattern}
+              style={styles.templatePrimaryButton}
+            >
+              {isCreatingPattern ? "Adding Row…" : "+ Add Template Row"}
+            </button>
+
+            <button
+              onClick={handleGenerateWeekFromPatterns}
+              disabled={isGeneratingFromPatterns}
+              style={styles.templateSecondaryButton}
+            >
+              {isGeneratingFromPatterns ? "Generating…" : "Generate This Week"}
+            </button>
+          </div>
+
+          {patterns.length === 0 ? (
+            <div style={styles.templateEmpty}>
+              No template rows yet. Fill out the fields above, then click “+ Add Template Row.”
+            </div>
+          ) : (
+            <div style={styles.templateRows}>
+              {patterns.map((p) => (
+                <div key={p.pattern_id} style={styles.templateRow}>
+                  <div>
+                    <div style={styles.templateTitle}>
+                      {p.template_scope === "daily" ? "Daily" : "Weekly"} • {p.template_scope === "daily" ? "Every day" : weekdayLabel(p.weekday)} • {shortTime(p.start_time)} • {p.dive_site_name || `Site #${p.dive_site_id}`}
+                    </div>
+                    <div style={styles.templateSubline}>
+                      <div>
+                        Meet: {shortTime(p.meet_time)}
+                        {p.meet_location ? ` at ${p.meet_location}` : " at Location TBD"}
+                      </div>
+                      <div>
+                        Type: {sessionTypeLabel(p.session_type)}
+                      </div>
+                    </div>
                   </div>
-                  <div style={styles.templateSubline}>
-                    <div>
-                      Meet: {shortTime(p.meet_time)}
-                      {p.meet_location ? ` at ${p.meet_location}` : " at Location TBD"}
-                    </div>
-                    <div>
-                      Type: {sessionTypeLabel(p.session_type)}
-                    </div>
+
+                  <div style={styles.templateMeta}>
+                    <span>{p.vessel_name || "Vessel TBD"}</span>
+                    <span>Guide {p.lead_guide_id || "TBD"}</span>
+                    <span>Cap {p.default_capacity || "default"}</span>
+                    <span>{p.price_per_diver ? `${p.price_per_diver} JOD` : "Price TBD"}</span>
                   </div>
                 </div>
-
-                <div style={styles.templateMeta}>
-                  <span>{p.vessel_name || "Vessel TBD"}</span>
-                  <span>Guide {p.lead_guide_id || "TBD"}</span>
-                  <span>Cap {p.default_capacity || "default"}</span>
-                  <span>{p.price_per_diver ? `${p.price_per_diver} JOD` : "Price TBD"}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
       ) : null}
 
       {scheduleView === "schedule" ? (
         <>
-      <div style={styles.meta}>
-        <div>
-          <strong>Operator:</strong> {scheduleData.operator_id}
-        </div>
-        <div>
-          <strong>Week:</strong> {scheduleData.week.start} → {scheduleData.week.end}
-        </div>
-        <div>
-          <strong>Sessions:</strong> {scheduleData.sessions.length}
-        </div>
-      </div>
-
-      {dates.length === 0 ? (
-        <div
-          style={{
-            ...styles.card,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            alignItems: "flex-start"
-          }}
-        >
-          <div style={{ fontSize: 16, fontWeight: 700 }}>
-            No sessions scheduled for this week.
-          </div>
-
-          <div style={{ opacity: 0.8, lineHeight: 1.5 }}>
-            Generate real operational sessions from your active weekly templates.
-          </div>
-
-          <button
-            onClick={handleGenerateWeekFromPatterns}
-            disabled={isGeneratingFromPatterns}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              cursor: isGeneratingFromPatterns ? "not-allowed" : "pointer",
-              border: "1px solid rgba(0,0,0,0.10)",
-              background: "#1B4D6F",
-              color: "#F5F6F5",
-              fontWeight: 700,
-              opacity: isGeneratingFromPatterns ? 0.7 : 1
-            }}
-          >
-            {isGeneratingFromPatterns
-              ? "Generating Sessions…"
-              : "Generate Sessions for This Week"}
-          </button>
-        </div>
-      ) : (
-        dates.map((date) => (
-          <div key={date} style={styles.dayBlock}>
-            <div style={styles.dayHeader}>{weekdayFromYmd(date)} • {date}</div>
-
-            <div style={styles.dayList}>
-              {map[date].map((s) => {
-                const rowKey = (s as any).unified_id || s.session_id;
-                const isDiveSession = Boolean(s.session_id);
-                const isCancelling = isDiveSession && cancellingId === Number(s.session_id);
-
-                return (
-                  <div
-                    key={rowKey}
-                    style={{
-                      ...styles.sessionRow,
-                      ...(s.session_status === "cancelled" ? styles.cancelledRow : null)
-                    }}
-                  >
-                    <div style={styles.timeRail}>
-                      <div style={styles.startTime}>{s.start_time}</div>
-                    <div style={styles.meetTime}>
-                      Meet {s.meet_time || "—"}
-                    </div>
-
-                    {(s as any).meet_location ? (
-                      <div style={styles.meetLocation}>
-                        {(s as any).meet_location}
-                      </div>
-                    ) : null}
-                    </div>
-
-                    <div style={styles.opsContent}>
-                      <div style={styles.opsTitleLine}>
-                        <strong style={{ fontSize: 20 }}>{s.site_name}</strong>
-                        <span style={styles.typeBadge}>{s.type || s.session_type}</span>
-                        <span style={styles.statusBadge}>{statusLabel(s.ops_status)}</span>
-                      </div>
-
-                      <div style={styles.opsSubLine}>
-                        {s.itinerary_title} • {s.team_name}
-                      </div>
-
-                      <div style={styles.opsMetrics}>
-                        <div>
-                          <div style={styles.metricLabel}>Capacity</div>
-                          <div style={styles.metricValue}>{s.capacity_consumed ?? 0}/{s.capacity_total ?? "—"}</div>
-                        </div>
-
-                        <div>
-                          <div style={styles.metricLabel}>Remaining</div>
-                          <div style={styles.metricValue}>{s.capacity_remaining ?? "—"}</div>
-                        </div>
-
-                        <div>
-                          <div style={styles.metricLabel}>Price</div>
-                          <div style={styles.metricValue}>{formatMinorPrice(s.price_from_minor, s.currency)}</div>
-                        </div>
-
-                        <div>
-                          <div style={styles.metricLabel}>{s.type === "course" ? "Location" : "Vessel"}</div>
-                          <div style={styles.metricValue}>
-                            {s.vessel_name || (s.metadata as any)?.location || "—"}
-                          </div>
-                        </div>
-
-                        <div>
-                          <div style={styles.metricLabel}>Staff</div>
-                          <div style={styles.metricValue}>
-                            {(s.metadata as any)?.lead_guide_name || (s.metadata as any)?.instructor_name || "TBD"}
-                          </div>
-                        </div>
-                      </div>
-
-                      {s.session_status === "cancelled" ? (
-                        <div style={styles.cancelledNote}>Cancelled — visible for operational awareness.</div>
-                      ) : null}
-
-                      {s.notes ? <div style={styles.notes}>{s.notes}</div> : null}
-                    </div>
-
-                    <div style={styles.actionRail}>
-                      <div style={styles.unifiedId}>
-                        {(s as any).unified_id || `#${s.session_id}`}
-                      </div>
-
-                      {isDiveSession ? (
-                        <>
-                          <button
-                            onClick={() => handleCancel(Number(s.session_id))}
-                            disabled={isCancelling}
-                            style={styles.cancelButton}
-                          >
-                            {isCancelling ? "Cancelling…" : "Cancel"}
-                          </button>
-
-                          <button
-                            onClick={() => handleDelete(Number(s.session_id))}
-                            disabled={deletingId === Number(s.session_id)}
-                            style={styles.deleteButton}
-                          >
-                            {deletingId === Number(s.session_id) ? "Deleting…" : "Delete"}
-                          </button>
-                        </>
-                      ) : (
-                        <div style={styles.courseInventoryLabel}>Course inventory</div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+          <div style={styles.meta}>
+            <div>
+              <strong>Operator:</strong> {scheduleData.operator_id}
+            </div>
+            <div>
+              <strong>Week:</strong> {scheduleData.week.start} → {scheduleData.week.end}
+            </div>
+            <div>
+              <strong>Sessions:</strong> {scheduleData.sessions.length}
             </div>
           </div>
-        ))
-            )}
+
+          {dates.length === 0 ? (
+            <div
+              style={{
+                ...styles.card,
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+                alignItems: "flex-start"
+              }}
+            >
+              <div style={{ fontSize: 16, fontWeight: 700 }}>
+                No sessions scheduled for this week.
+              </div>
+
+              <div style={{ opacity: 0.8, lineHeight: 1.5 }}>
+                Generate real operational sessions from your active weekly templates.
+              </div>
+
+              <button
+                onClick={handleGenerateWeekFromPatterns}
+                disabled={isGeneratingFromPatterns}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  cursor: isGeneratingFromPatterns ? "not-allowed" : "pointer",
+                  border: "1px solid rgba(0,0,0,0.10)",
+                  background: "#1B4D6F",
+                  color: "#F5F6F5",
+                  fontWeight: 700,
+                  opacity: isGeneratingFromPatterns ? 0.7 : 1
+                }}
+              >
+                {isGeneratingFromPatterns
+                  ? "Generating Sessions…"
+                  : "Generate Sessions for This Week"}
+              </button>
+            </div>
+          ) : (
+            dates.map((date) => (
+              <div key={date} style={styles.dayBlock}>
+                <div style={styles.dayHeader}>{weekdayFromYmd(date)} • {date}</div>
+
+                <div style={styles.dayList}>
+                  {map[date].map((s) => {
+                    const rowKey = (s as any).unified_id || s.session_id;
+                    const isDiveSession = Boolean(s.session_id);
+                    const isCancelling = isDiveSession && cancellingId === Number(s.session_id);
+
+                    const actions = isDiveSession ? (
+                      <>
+                        <button
+                          onClick={() => handleCancel(Number(s.session_id))}
+                          disabled={isCancelling}
+                          style={styles.cancelButton}
+                        >
+                          {isCancelling ? "Cancelling…" : "Cancel"}
+                        </button>
+
+                        <button
+                          onClick={() => handleDelete(Number(s.session_id))}
+                          disabled={deletingId === Number(s.session_id)}
+                          style={styles.deleteButton}
+                        >
+                          {deletingId === Number(s.session_id) ? "Deleting…" : "Delete"}
+                        </button>
+                      </>
+                    ) : (
+                      <div style={styles.courseInventoryLabel}>Course inventory</div>
+                    );
+
+                    return (
+                      <DashboardSessionCard
+                        key={rowKey}
+                        session={s}
+                        variant="schedule"
+                        priceLabel={formatMinorPrice(s.price_from_minor, s.currency)}
+                        debugLabel={(s as any).unified_id || `#${s.session_id}`}
+                        actions={actions}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
         </>
       ) : null}
     </div>
@@ -985,7 +905,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 18,
     margin: "0 0 4px"
   },
-    scheduleTabs: {
+  scheduleTabs: {
     display: "flex",
     gap: 8,
     marginBottom: 12
@@ -1048,7 +968,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 8,
     marginBottom: 12
   },
-    templateField: {
+  templateField: {
     display: "grid",
     gap: 4,
     fontSize: 11,
@@ -1056,7 +976,7 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase",
     opacity: 0.85
   },
-    templateActions: {
+  templateActions: {
     display: "flex",
     gap: 10,
     alignItems: "center",
@@ -1139,169 +1059,33 @@ const styles: Record<string, React.CSSProperties> = {
     display: "grid",
     gap: 16
   },
-  sessionRow: {
-    display: "grid",
-    gridTemplateColumns: "90px minmax(0, 1fr) 130px",
-    gap: 14,
-    padding: 14,
-    border: "1px solid rgba(0,0,0,0.05)",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-    borderRadius: 12,
-    background: "#ffffff",
-    alignItems: "start"
+  cancelButton: {
+    marginTop: 10,
+    padding: "8px 12px",
+    borderRadius: 10,
+    cursor: "pointer",
+    border: "1px solid rgba(255,0,0,0.35)",
+    background: "#fff5f5",
+    color: "rgba(180,0,0,0.95)",
+    fontWeight: 700,
+    fontSize: 12
   },
-cancelledRow: {
-  background: "rgba(255,0,0,0.025)"
-},
-timeRail: {
-  borderRight: "1px solid rgba(0,0,0,0.08)",
-  paddingRight: 10
-},
-startTime: {
-  fontSize: 24,
-  fontWeight: 800,
-  lineHeight: 1,
-  letterSpacing: "-0.5px"
-},
-meetTime: {
-  marginTop: 4,
-  fontSize: 12,
-  opacity: 0.7
-},
-meetLocation: {
-  marginTop: 4,
-  fontSize: 12,
-  fontWeight: 700,
-  opacity: 0.85
-},
-opsContent: {
-  minWidth: 0
-},
-opsTitleLine: {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  flexWrap: "wrap",
-  fontSize: 16,
-  marginBottom: 4
-},
-opsSubLine: {
-  fontSize: 13,
-  opacity: 0.72,
-  marginBottom: 10
-},
-opsMetrics: {
-  display: "grid",
-  gridTemplateColumns: "repeat(5, minmax(90px, 1fr))",
-  gap: 10,
-  marginTop: 8
-},
-metricLabel: {
-  fontSize: 10,
-  opacity: 0.45,
-  textTransform: "uppercase",
-  fontWeight: 700,
-  letterSpacing: "0.05em"
-},
-metricValue: {
-  fontSize: 13,
-  fontWeight: 700,
-  marginTop: 2
-},
-actionRail: {
-  textAlign: "right",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-end",
-  justifyContent: "space-between",
-  minHeight: "100%"
-},
-unifiedId: {
-  fontSize: 12,
-  opacity: 0.7,
-  wordBreak: "break-word"
-},
-cancelButton: {
-  marginTop: 10,
-  padding: "8px 12px",
-  borderRadius: 10,
-  cursor: "pointer",
-  border: "1px solid rgba(255,0,0,0.35)",
-  background: "#fff5f5",
-  color: "rgba(180,0,0,0.95)",
-  fontWeight: 700,
-  fontSize: 12
-},
-deleteButton: {
-  marginTop: 8,
-  padding: "8px 12px",
-  borderRadius: 10,
-  cursor: "pointer",
-  border: "1px solid rgba(0,0,0,0.25)",
-  background: "#ffffff",
-  color: "rgba(40,40,40,0.95)",
-  fontWeight: 700,
-  fontSize: 12
-},
-courseInventoryLabel: {
-  marginTop: 10,
-  fontSize: 12,
-  opacity: 0.7
-},
-timeCol: {},
-mainCol: {},
-idCol: {
-  textAlign: "right"
-},
-subtle: {
-  opacity: 0.75,
-  fontSize: 13
-},
-titleLine: {
-  marginBottom: 4
-},
-notes: {
-  marginTop: 8,
-  fontSize: 13,
-  opacity: 0.9
-},
-typeBadge: {
-  display: "inline-block",
-  padding: "2px 7px",
-  borderRadius: 999,
-  background: "rgba(0, 212, 255, 0.16)",
-  color: "#06344A",
-  fontSize: 12,
-  fontWeight: 800,
-  textTransform: "uppercase"
-},
-statusBadge: {
-  display: "inline-block",
-  padding: "2px 7px",
-  borderRadius: 999,
-  background: "rgba(0,0,0,0.08)",
-  color: "#263238",
-  fontSize: 12,
-  fontWeight: 700,
-  textTransform: "uppercase"
-},
-detailGrid: {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: "4px 10px",
-  marginTop: 8,
-  fontSize: 13,
-  opacity: 0.9
-},
-cancelledNote: {
-  marginTop: 10,
-  padding: "7px 9px",
-  borderRadius: 8,
-  background: "rgba(255,0,0,0.08)",
-  color: "rgba(150,0,0,0.95)",
-  fontSize: 13,
-  fontWeight: 700
-},
+  deleteButton: {
+    marginTop: 8,
+    padding: "8px 12px",
+    borderRadius: 10,
+    cursor: "pointer",
+    border: "1px solid rgba(0,0,0,0.25)",
+    background: "#ffffff",
+    color: "rgba(40,40,40,0.95)",
+    fontWeight: 700,
+    fontSize: 12
+  },
+  courseInventoryLabel: {
+    marginTop: 10,
+    fontSize: 12,
+    opacity: 0.7
+  },
   bannerWarn: {
     padding: 12,
     borderRadius: 10,

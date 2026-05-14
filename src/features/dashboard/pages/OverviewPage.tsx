@@ -8,8 +8,8 @@
 
   Author: Larry McLean + ChatGPT
   Created: 2026-05-13
-  Version: 0.1.1
-  Status: ACTIVE - P10.12 Overview MVP
+  Version: 0.1.2
+  Status: ACTIVE - P10.14 shared session card wiring
 
   Change Log:
     - 2026-05-13 - v0.1.0:
@@ -18,6 +18,8 @@
     - 2026-05-13 - v0.1.1:
       - Polish overview layout to match approved Pro Dashboard mock style.
       - Remove noisy action links from schedule body.
+    - 2026-05-14 - v0.1.2:
+      - Wire Today’s Schedule rows to shared DashboardSessionCard presentation component.
 */
 
 import React, { useMemo } from "react";
@@ -25,6 +27,7 @@ import { Link } from "react-router-dom";
 import { CalendarDays, Users, Waves } from "lucide-react";
 import { useDashboardSchedule } from "../../../hooks/useDashboardSchedule";
 import type { DashboardScheduleSession } from "../../../types/dashboardSchedule";
+import DashboardSessionCard from "../components/DashboardSessionCard";
 
 function todayYmd(timezone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -48,19 +51,6 @@ function todayYmd(timezone: string) {
 function weekdayFromYmd(value: string) {
   const date = new Date(`${value}T12:00:00`);
   return date.toLocaleDateString("en-US", { weekday: "long" });
-}
-
-function statusLabel(value: string | null | undefined) {
-  if (!value) return "unknown";
-  return value.replace(/_/g, " ");
-}
-
-function getLeadName(session: DashboardScheduleSession) {
-  return (
-    (session.metadata as any)?.lead_guide_name ||
-    (session.metadata as any)?.instructor_name ||
-    "TBD"
-  );
 }
 
 export default function OverviewPage() {
@@ -162,7 +152,7 @@ export default function OverviewPage() {
             </div>
           </div>
 
-        <Link className="aqx-overview-schedule-button" to="/dashboard/calendar">
+          <Link className="aqx-overview-schedule-button" to="/dashboard/calendar">
             <CalendarDays />
             <span>View full calendar</span>
           </Link>
@@ -175,46 +165,11 @@ export default function OverviewPage() {
         ) : (
           <div className="aqx-overview-session-list">
             {todaySessions.map((session: DashboardScheduleSession) => (
-              <div
+              <DashboardSessionCard
                 key={(session as any).unified_id || session.session_id}
-                className="aqx-overview-session-row"
-              >
-                <div className="aqx-overview-session-time">
-                  <div className="aqx-overview-start-time">{session.start_time}</div>
-                  <div className="aqx-overview-meet-time">
-                    Meet {session.meet_time || "—"}
-                  </div>
-                  {session.meet_location ? (
-                    <div className="aqx-overview-meet-location">
-                      {session.meet_location}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="aqx-overview-session-main">
-                  <div className="aqx-overview-session-title-line">
-                    <div className="aqx-overview-session-title">{session.site_name}</div>
-                    <span className="aqx-overview-pill">{session.session_type}</span>
-                    <span className="aqx-overview-pill-muted">
-                      {statusLabel(session.ops_status)}
-                    </span>
-                  </div>
-
-                  <div className="aqx-overview-session-meta">
-                    Vessel: {session.vessel_name || "TBD"} • Staff: {getLeadName(session)}
-                  </div>
-                </div>
-
-                <div className="aqx-overview-capacity">
-                  <div className="aqx-overview-capacity-label">Capacity</div>
-                  <div className="aqx-overview-capacity-value">
-                    {session.capacity_consumed ?? 0}/{session.capacity_total ?? "—"}
-                  </div>
-                  <div className="aqx-overview-capacity-sub">
-                    {session.capacity_remaining ?? "—"} remaining
-                  </div>
-                </div>
-              </div>
+                session={session}
+                variant="overview"
+              />
             ))}
           </div>
         )}
