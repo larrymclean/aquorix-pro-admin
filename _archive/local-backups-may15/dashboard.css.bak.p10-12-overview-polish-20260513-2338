@@ -1,0 +1,456 @@
+/*
+  File: dashboard.css
+  Path: src/styles/dashboard.css
+  Description: Dashboard layout primitives + Phase C compatibility bridge.
+               IMPORTANT:
+               - ThemeProvider applies .theme-* classes (themes.css).
+               - This file MUST respond to .theme-* via CSS variables.
+               - Layout authority is here: flex column shell + flex row body.
+
+  Author: Larry McLean + AI Team
+  Version: 1.0.2
+  Last Updated: 2026-01-11
+  Status: Phase C (Locked – layout authority restored)
+
+  Change Log:
+    - 2026-01-10 - v1.0.1 (Larry McLean + AI Team)
+      - Add compatibility bridge: .theme-dive-locker/.theme-blue-steel/.theme-bamboo-safari
+      - Stop relying on legacy .aqx-theme-* class attachment
+      - Keep existing aqx-* component styling intact
+    - 2026-01-11 - v1.0.2 (Larry McLean + AI Team)
+      - FIX: Restore proper dashboard geometry using flex layout (no 100vh math rows)
+      - FIX: Sidebar constrained below TopNav (no full-viewport bleed)
+      - FIX: Remove bottom white band via min-height:0 + root height locks
+      - ADD: Minimal dashboard card styling baseline (scoped) so body doesn't look raw
+*/
+
+* { box-sizing: border-box; }
+
+/* Height locks prevent bottom band + wrong scroll container */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+  background-color: var(--aqx-body-bg, #ffffff);
+  color: var(--aqx-body-text, #1e1e1e);
+}
+
+/* Root theme wrapper – same class as React shell */
+.aqx-pro-dashboard-theme {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--aqx-body-bg, #ffffff);
+}
+
+/* ============================
+   PHASE C LAYOUT PRIMITIVES
+   Geometry authority lives here.
+============================ */
+
+/* Top nav wrapper used by shell: <header className="aqx-topnav"> */
+.aqx-topnav {
+  flex: 0 0 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+
+  background-color: var(--topnav-bg, rgba(0,0,0,0.65));
+  border-bottom: 1px solid var(--topnav-border, rgba(255,255,255,0.10));
+
+  /* Keeps it visually stable without using global fixed hacks */
+  position: sticky;
+  top: 0;
+  z-index: 999;
+}
+
+/* Body row: sidebar + main (fills remaining height under topnav) */
+.aqx-dashboard-root {
+  flex: 1;
+  min-height: 0;     /* critical: allows children to scroll properly */
+  display: flex;
+}
+
+/* Sidebar container from shell: <aside className="aqx-sidebar ..."> */
+.aqx-sidebar {
+  flex: 0 0 var(--sidebar-expanded-width, 180px);
+  width: var(--sidebar-expanded-width, 180px);
+  background-color: var(--sidebar-bg) !important;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(0,0,0,0.08);
+  transition: width 0.18s ease, flex-basis 0.18s ease;
+}
+
+.aqx-sidebar.aqx-sidebar--collapsed {
+  flex-basis: var(--sidebar-collapsed-width, 56px);
+  width: var(--sidebar-collapsed-width, 56px);
+}
+
+/* Right pane wraps the main */
+.aqx-right-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;   /* critical */
+  display: flex;
+  flex-direction: column;
+}
+
+/* =============================
+   THEME CANVAS / MAIN BACKGROUND
+   ============================= */
+
+.aqx-main {
+  background: var(--aqx-background, var(--body-bg, #f5f6f5));
+  min-height: 100vh;
+}
+
+.aqx-main-inner {
+  background: transparent;
+}
+
+
+/* Main content area (must be readable; scroll lives here) */
+.aqx-main {
+  flex: 1;
+  min-height: 0;   /* critical */
+  overflow-y: auto;
+  padding: 24px;
+
+  background-color: var(--aqx-body-bg, #ffffff);
+  color: var(--aqx-body-text, #1e1e1e);
+}
+
+/* ============================
+   COMPATIBILITY BRIDGE (TEMP)
+============================ */
+
+.theme-dive-locker {
+  --sidebar-expanded-width: 180px;
+  --sidebar-collapsed-width: 56px;
+}
+
+/* Keep these bridges minimal (NO .aqx-main overrides!) */
+.theme-dive-locker .aqx-sidebar { background-color: var(--sidebar-bg) !important; }
+.theme-dive-locker .aqx-topnav { background-color: var(--topnav-bg); border-bottom-color: var(--topnav-border); }
+
+.theme-blue-steel .aqx-sidebar { background-color: var(--sidebar-bg) !important; }
+.theme-blue-steel .aqx-topnav { background-color: var(--topnav-bg); border-bottom-color: var(--topnav-border); }
+
+.theme-bamboo-safari .aqx-sidebar { background-color: var(--sidebar-bg) !important; }
+.theme-bamboo-safari .aqx-topnav { background-color: var(--topnav-bg); border-bottom-color: var(--topnav-border); }
+
+/* ============================
+   MINIMAL BODY "CARD" BASELINE
+   (So the dashboard does not look like raw HTML)
+   Safe + scoped: only affects common dashboard patterns.
+============================ */
+
+.aqx-main h1 {
+  margin: 0 0 12px 0;
+  font-size: 32px;
+  line-height: 1.15;
+}
+
+.aqx-main p {
+  margin: 0 0 16px 0;
+}
+
+.aqx-card,
+.aqx-panel,
+.aqx-metric-card,
+.aqx-tile {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.aqx-card + .aqx-card,
+.aqx-panel + .aqx-panel,
+.aqx-metric-card + .aqx-metric-card,
+.aqx-tile + .aqx-tile {
+  margin-top: 12px;
+}
+
+/* ============================
+   EXISTING COMPONENT STYLES (aqx-*)
+   (Your original content kept as-is below)
+============================ */
+
+/* Sidebar header */
+.aqx-sidebar-header { padding: 16px 20px 8px; }
+.aqx-sidebar-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.70);
+  letter-spacing: 0.12em;
+}
+.aqx-sidebar-title {
+  font-weight: 600;
+  margin-top: 4px;
+  font-size: 15px;
+  color: #ffffff;
+}
+
+/* Sidebar nav */
+.aqx-sidebar-nav {
+  padding: 8px 0 16px;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 4px 10px;
+  text-decoration: none;
+  color: #ffffff;
+  font-size: 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-item:hover {
+  background: var(--sidebar-pill-hover, rgba(255,255,255,0.12));
+  color: #ffffff;
+}
+.sidebar-item:hover svg { stroke: currentColor; }
+
+.sidebar-item--active {
+  background: var(--sidebar-pill-active, rgba(255,255,255,0.20));
+  color: #ffffff;
+}
+
+.sidebar-item svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.9;
+  stroke: currentColor;
+}
+
+/* Sidebar header logo */
+.aqx-sidebar-header img {
+  width: 90px;
+  height: auto;
+  display: block;
+  margin-bottom: 4px;
+  opacity: 0.50;
+}
+
+/* Sidebar footer */
+.aqx-sidebar-footer {
+  margin-top: auto;
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.aqx-sidebar-tagline {
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.aqx-sidebar-version {
+  color: #ffffff;
+  font-size: 10px;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.aqx-sidebar-brand {
+  color: #ffffff;
+  font-family: "Avenir Next", system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  text-align: center;
+  letter-spacing: 0.00em;
+  margin-bottom: 0px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+}
+
+/* =============================
+   ICON PILL + ICON COLORING
+   ============================= */
+
+.aqx-metric-icon-pill {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+
+  /* This drives lucide icon color via currentColor */
+  color: var(--aqx-primary, #17609b);
+}
+
+.aqx-metric-icon-pill svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Optional: icons inside cards if they appear “unstyled” */
+.aqx-card svg.lucide {
+  color: var(--aqx-primary, #17609b);
+}
+
+.aqx-brand-icon { width: 26px; height: 22px; display: block; }
+
+/* Collapse behavior */
+.aqx-sidebar.aqx-sidebar--collapsed .sidebar-item {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.aqx-sidebar.aqx-sidebar--collapsed .sidebar-item span { display: none; }
+.aqx-sidebar.aqx-sidebar--collapsed .aqx-sidebar-footer { padding-inline: 0; }
+
+.aqx-sidebar.aqx-sidebar--collapsed .aqx-sidebar-brand span,
+.aqx-sidebar.aqx-sidebar--collapsed .aqx-sidebar-tagline,
+.aqx-sidebar.aqx-sidebar--collapsed .aqx-sidebar-version { display: none; }
+
+.aqx-sidebar.aqx-sidebar--collapsed .aqx-brand-icon {
+  width: 24px;
+  height: 20px;
+}
+
+/* Toggle button */
+.aqx-sidebar-toggle {
+  align-self: flex-start;
+  margin: 6px 10px 8px 10px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.aqx-sidebar-toggle:hover {
+  background: var(--sidebar-pill-hover, rgba(255,255,255,0.12));
+}
+
+.aqx-sidebar-toggle svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+/* Center toggle when collapsed */
+.aqx-sidebar.aqx-sidebar--collapsed .aqx-sidebar-toggle {
+  align-self: stretch;
+  width: 100%;
+  margin: 6px 0 8px 0;
+  padding: 6px 0;
+  display: flex;
+  justify-content: center;
+}
+.aqx-sidebar.aqx-sidebar--collapsed .aqx-sidebar-toggle svg { transform: rotate(180deg); }
+
+/* =============================
+   FALLBACK TEXT LOGO TILE
+   (When no uploaded image)
+   ============================= */
+
+.aqx-topnav div[title="No logo (text brand)"] {
+  background: rgba(0, 0, 0, 0.08) !important; /* readable on white topnav */
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  color: var(--aqx-primary, #17609b);
+  letter-spacing: 0.5px;
+}
+
+/* Topnav internal blocks */
+.aqx-topnav-operator-block { display: flex; flex-direction: column; gap: 2px; }
+.aqx-topnav-label {
+  font-size: 11px;
+  color: var(--aqx-muted, rgba(255,255,255,0.70));
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.aqx-topnav-operator-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--aqx-accent, #68a3c2);
+}
+
+.aqx-topnav-actions { display: flex; gap: 8px; align-items: center; }
+
+.aqx-topnav-left { display: flex; align-items: center; gap: 12px; }
+.aqx-topnav-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  flex-shrink: 0;
+}
+.aqx-topnav-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Buttons */
+.aqx-btn-primary {
+  background-color: var(--aqx-accent, #68a3c2);
+  color: #071521;
+  border-radius: 6px;
+  padding: 0 20px;
+  min-height: 36px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: filter 0.2s;
+}
+.aqx-btn-primary:hover { filter: brightness(1.05); }
+
+.aqx-btn-icon {
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.aqx-btn-icon:hover { background: rgba(255,255,255,0.08); }
+.aqx-btn-icon svg { width: 18px; height: 18px; stroke: var(--aqx-text, #ffffff); }
+
+/* Focus */
+.aqx-pro-dashboard-theme button:focus-visible,
+.aqx-pro-dashboard-theme a:focus-visible {
+  outline: 2px solid var(--aqx-accent, #68a3c2);
+  outline-offset: 2px;
+}

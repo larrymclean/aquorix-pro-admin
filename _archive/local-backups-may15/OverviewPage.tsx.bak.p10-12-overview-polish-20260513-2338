@@ -1,0 +1,226 @@
+/*
+  File: OverviewPage.tsx
+  Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/src/features/dashboard/pages/OverviewPage.tsx
+  Description:
+    P10.12 Operator Overview MVP.
+    Default Pro Dashboard landing surface showing today's operational schedule
+    from the existing dashboard schedule API.
+
+  Author: Larry McLean + ChatGPT
+  Created: 2026-05-13
+  Version: 0.1.0
+  Status: ACTIVE - P10.12 Overview MVP
+
+  Change Log:
+    - 2026-05-13 - v0.1.0:
+      - Create live operator overview using useDashboardSchedule().
+      - Show today's sessions, capacity summary, and quick actions.
+*/
+
+import React, { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { CalendarDays, ExternalLink, Users, Waves } from "lucide-react";
+import { useDashboardSchedule } from "../../../hooks/useDashboardSchedule";
+import type { DashboardScheduleSession } from "../../../types/dashboardSchedule";
+
+function todayYmd() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function weekdayFromYmd(value: string) {
+  const date = new Date(`${value}T12:00:00`);
+  return date.toLocaleDateString("en-US", { weekday: "long" });
+}
+
+function statusLabel(value: string | null | undefined) {
+  if (!value) return "unknown";
+  return value.replace(/_/g, " ");
+}
+
+function getLeadName(session: DashboardScheduleSession) {
+  return (
+    (session.metadata as any)?.lead_guide_name ||
+    (session.metadata as any)?.instructor_name ||
+    "TBD"
+  );
+}
+
+export default function OverviewPage() {
+  const { state } = useDashboardSchedule();
+  const scheduleData = (state as any).data as any;
+  const today = todayYmd();
+
+  const todaySessions = useMemo(() => {
+    const sessions = Array.isArray(scheduleData?.sessions) ? scheduleData.sessions : [];
+    return sessions
+      .filter((session: DashboardScheduleSession) => session.session_date === today)
+      .sort((a: DashboardScheduleSession, b: DashboardScheduleSession) =>
+        (a.start_time || "").localeCompare(b.start_time || "")
+      );
+  }, [scheduleData, today]);
+
+  const totals = useMemo(() => {
+    return todaySessions.reduce(
+      (acc: any, session: DashboardScheduleSession) => {
+        acc.sessions += 1;
+        acc.capacity += Number(session.capacity_total || 0);
+        acc.consumed += Number(session.capacity_consumed || 0);
+        acc.remaining += Number(session.capacity_remaining || 0);
+        return acc;
+      },
+      { sessions: 0, capacity: 0, consumed: 0, remaining: 0 }
+    );
+  }, [todaySessions]);
+
+  if (state.status === "loading") {
+    return (
+      <div className="aqx-main-inner">
+        <div className="aqx-card">Loading overview…</div>
+      </div>
+    );
+  }
+
+  if (state.status === "error" && !scheduleData) {
+    return (
+      <div className="aqx-main-inner">
+        <div className="aqx-card">Overview load failed.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="aqx-main-inner">
+      <div className="aqx-main-header">
+        <h1>Overview</h1>
+        <p>
+          {weekdayFromYmd(today)} • {today} • Today’s operational snapshot.
+        </p>
+      </div>
+
+      <div className="aqx-metric-grid">
+        <div className="aqx-card aqx-metric-card">
+          <div className="aqx-metric-header">
+            <div className="aqx-metric-title">Sessions today</div>
+            <div className="aqx-metric-icon-pill">
+              <Waves />
+            </div>
+          </div>
+          <div className="aqx-metric-value">{totals.sessions}</div>
+          <div className="aqx-metric-subtitle">Scheduled for today</div>
+        </div>
+
+        <div className="aqx-card aqx-metric-card">
+          <div className="aqx-metric-header">
+            <div className="aqx-metric-title">Divers / capacity</div>
+            <div className="aqx-metric-icon-pill">
+              <Users />
+            </div>
+          </div>
+          <div className="aqx-metric-value">
+            {totals.consumed}/{totals.capacity}
+          </div>
+          <div className="aqx-metric-subtitle">Confirmed + active holds</div>
+        </div>
+
+        <div className="aqx-card aqx-metric-card">
+          <div className="aqx-metric-header">
+            <div className="aqx-metric-title">Remaining seats</div>
+            <div className="aqx-metric-icon-pill">
+              <CalendarDays />
+            </div>
+          </div>
+          <div className="aqx-metric-value">{totals.remaining}</div>
+          <div className="aqx-metric-subtitle">Available today</div>
+        </div>
+      </div>
+
+      <div className="aqx-card aqx-schedule-card">
+        <div className="aqx-schedule-header">
+          <div>
+            <div className="aqx-schedule-title">Today’s Schedule</div>
+            <div style={{ fontSize: 13, opacity: 0.72, marginTop: 4 }}>
+              Real sessions for the current operator.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Link className="aqx-btn-secondary" to="/dashboard/schedule">
+              <CalendarDays />
+              <span>Open Schedule</span>
+            </Link>
+
+            <Link className="aqx-btn-secondary" to="/ops-board">
+              <ExternalLink />
+              <span>Open Ops Board</span>
+            </Link>
+          </div>
+        </div>
+
+        {todaySessions.length === 0 ? (
+          <div className="aqx-schedule-body">
+            No sessions scheduled for today. Open Schedule to create a session or generate from weekly templates.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {todaySessions.map((session: DashboardScheduleSession) => (
+              <div
+                key={(session as any).unified_id || session.session_id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "86px minmax(0, 1fr) 120px",
+                  gap: 14,
+                  padding: 14,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                  borderRadius: 12,
+                  background: "#ffffff"
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>
+                    {session.start_time}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                    Meet {session.meet_time || "—"}
+                  </div>
+                  {session.meet_location ? (
+                    <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>
+                      {session.meet_location}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: 18 }}>{session.site_name}</strong>
+                    <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", opacity: 0.65 }}>
+                      {session.session_type}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", opacity: 0.65 }}>
+                      {statusLabel(session.ops_status)}
+                    </span>
+                  </div>
+
+                  <div style={{ marginTop: 8, fontSize: 13, opacity: 0.78 }}>
+                    Vessel: {session.vessel_name || "TBD"} • Staff: {getLeadName(session)}
+                  </div>
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, opacity: 0.55, textTransform: "uppercase", fontWeight: 800 }}>
+                    Capacity
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>
+                    {session.capacity_consumed ?? 0}/{session.capacity_total ?? "—"}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.72 }}>
+                    {session.capacity_remaining ?? "—"} remaining
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

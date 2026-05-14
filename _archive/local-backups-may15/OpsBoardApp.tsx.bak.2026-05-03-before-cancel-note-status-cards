@@ -1,0 +1,317 @@
+/*
+ * File: OpsBoardApp.tsx
+ * Path: src/features/ops-board/OpsBoardApp.tsx
+ * Description: Static React MVP shell for AQUORIX Dive Ops Board. Matches approved light whiteboard prototype with PAX card column.
+ * Author: Larry McLean + ChatGPT
+ * Created: 2026-05-03
+ * Version: 0.3.0
+ * Status: P10.7-C2 static fixture shell
+ *
+ * Change Log:
+ * - 2026-05-03: v0.1.0 - Initial standalone route shell.
+ * - 2026-05-03: v0.2.0 - Replace drifted layout with approved Ops Board wireframe structure.
+ * - 2026-05-03: v0.3.0 - Add per-session PAX card column after session details.
+ */
+
+import React from 'react';
+import './styles/opsBoard.css';
+
+function AlphaFlag() {
+  return (
+    <span className="title-icon">
+      <svg viewBox="0 0 64 42" width="38" height="28" aria-label="Alpha boat dive flag">
+        <path d="M4 4 H30 V38 H4 Z" fill="#ffffff" stroke="#0a6c9b" strokeWidth="4" />
+        <path d="M30 4 H60 L48 21 L60 38 H30 Z" fill="#0a6c9b" stroke="#0a6c9b" strokeWidth="4" />
+        <path d="M30 4 V38" stroke="#ffffff" strokeWidth="5" />
+      </svg>
+    </span>
+  );
+}
+
+function DiverDownFlag() {
+  return (
+    <span className="title-icon">
+      <svg viewBox="0 0 64 42" width="38" height="28" aria-label="Diver down shore dive flag">
+        <rect x="5" y="5" width="54" height="32" fill="#d71920" stroke="#9c1117" strokeWidth="3" />
+        <path d="M14 6 L54 36" stroke="#ffffff" strokeWidth="10" strokeLinecap="square" />
+      </svg>
+    </span>
+  );
+}
+
+function CourseBookIcon() {
+  return (
+    <span className="title-icon">
+      <svg viewBox="0 0 64 42" width="34" height="25" aria-label="Course book icon">
+        <path d="M10 8 H29 C33 8 36 10 38 13 V35 C35 33 32 32 28 32 H10 Z" fill="#0a6c9b" />
+        <path d="M38 13 C40 10 43 8 47 8 H54 V32 H46 C42 32 40 33 38 35 Z" fill="#248dc1" />
+        <path d="M38 13 V35" stroke="#ffffff" strokeWidth="3" />
+      </svg>
+    </span>
+  );
+}
+
+function Ready() {
+  return <span className="person-dot person-ready">✓</span>;
+}
+
+function Warn() {
+  return <span className="person-dot person-warn">!</span>;
+}
+
+function Attention() {
+  return <span className="person-dot person-attention">⚠</span>;
+}
+
+function Ean() {
+  return <span className="ean-pill">EAN</span>;
+}
+
+function Tx() {
+  return <span className="tx-pill">Tx</span>;
+}
+
+function SunIcon() {
+  return (
+    <svg className="sun-icon" viewBox="0 0 64 64" aria-label="Sunny">
+      <circle cx="32" cy="32" r="14" fill="#ffd33d" stroke="#d08a00" strokeWidth="3" />
+      <circle cx="26" cy="26" r="4" fill="#fff3b0" opacity="0.75" />
+      <g stroke="#f2a900" strokeWidth="5" strokeLinecap="round">
+        <line x1="32" y1="4" x2="32" y2="13" />
+        <line x1="32" y1="51" x2="32" y2="60" />
+        <line x1="4" y1="32" x2="13" y2="32" />
+        <line x1="51" y1="32" x2="60" y2="32" />
+        <line x1="12" y1="12" x2="18" y2="18" />
+        <line x1="46" y1="46" x2="52" y2="52" />
+        <line x1="52" y1="12" x2="46" y2="18" />
+        <line x1="18" y1="46" x2="12" y2="52" />
+      </g>
+    </svg>
+  );
+}
+
+type OpsRowProps = {
+  time: string;
+  type: string;
+  title: React.ReactNode;
+  sub: string;
+  badges: React.ReactNode;
+  pax: number;
+  roster: React.ReactNode;
+  status: React.ReactNode;
+  cancelled?: boolean;
+};
+
+function OpsRow({ time, type, title, sub, badges, pax, roster, status, cancelled = false }: OpsRowProps) {
+  return (
+    <div className={cancelled ? 'ops-row cancelled-row' : 'ops-row'}>
+      <div className="time">{time}</div>
+      <div className="type">{type}</div>
+
+      <div className="session-details">
+        <div className="title">{title}</div>
+        <div className="sub">{sub}</div>
+        <div className="badges">{badges}</div>
+      </div>
+
+      <div className="pax-card">
+        <div className="pax-number">{pax}</div>
+        <div className="pax-label">PAX</div>
+      </div>
+
+      <div className="roster">
+        <div className="roster-title">Roster</div>
+        <div className="roster-grid">{roster}</div>
+      </div>
+
+      {status}
+    </div>
+  );
+}
+
+function OpsBoardApp() {
+  return (
+    <div className="ops-board">
+      <div className="ops-top">
+        <div className="ops-brand">
+          <img src="/operator-logo.png" alt="Blue Current Divers Logo" />
+          <div className="ops-operator-name">BLUE CURRENT DIVERS</div>
+        </div>
+
+        <div className="ops-weather">
+          <div className="weather-icon-wrap"><SunIcon /></div>
+          <div>
+            <div className="weather-main">SUNNY</div>
+            <div className="weather-sub">AIR 29°C | WATER 24°C | WIND LIGHT</div>
+          </div>
+        </div>
+
+        <div className="date-time">SAT MAY 02, 2026&nbsp;&nbsp;08:12</div>
+      </div>
+
+      <div className="sync"><span className="online-dot"></span><span>ONLINE | LAST SYNC: 08:11</span></div>
+
+      <div className="strip">25 PAX | 6 PU | 7 EAN | 2 TX | 23 GEAR | REVIEW 1 | WAIT 3 | HOLD 4</div>
+
+      <OpsRow
+        time="07:30"
+        type="DIVE"
+        title={<>Cedar Pride Wreck <AlphaFlag /></>}
+        sub="Omar Khalil — Dolphin"
+        badges={<>PU 1 | <span className="review">REVIEW</span> | NOTE</>}
+        pax={4}
+        cancelled
+        roster={
+          <>
+            <div className="roster-line"><span className="roster-num">1.</span>Sarah B.<Warn /></div>
+            <div className="roster-line"><span className="roster-num">2.</span>Mark T.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">3.</span>Nadia K.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">4.</span>Rashid H.<Warn /></div>
+          </>
+        }
+        status={<div className="status cancelled"><div className="status-main status-cancelled-main">CANCELLED</div></div>}
+      />
+
+      <OpsRow
+        time="08:00"
+        type="COURSE"
+        title={<>Open Water Scuba Diver <CourseBookIcon /></>}
+        sub="Layla Mansour — Classroom / Confined — Day 2 of 4"
+        badges={<>PU 2 | GEAR 4</>}
+        pax={4}
+        roster={
+          <>
+            <div className="roster-line"><span className="roster-num">1.</span>Emma R.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">2.</span>Noah K.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">3.</span>Maya H.<Warn /></div>
+            <div className="roster-line"><span className="roster-num">4.</span>Owen P.<Ready /></div>
+          </>
+        }
+        status={<div className="status nearly-full"><div className="status-number">2</div><div className="status-label">SPOTS</div></div>}
+      />
+
+      <OpsRow
+        time="08:30"
+        type="DIVE"
+        title={<>Japanese Garden <DiverDownFlag /></>}
+        sub="Yasmin Haddad — SHORE"
+        badges={<>PU 1 | EAN 2 | GEAR 4 | MINOR | NOTE</>}
+        pax={3}
+        roster={
+          <>
+            <div className="roster-line"><span className="roster-num">1.</span>Larry M.<Ean /><Ready /></div>
+            <div className="roster-line"><span className="roster-num">2.</span>Shawn S.<Ean /><Warn /></div>
+            <div className="roster-line"><span className="roster-num">3.</span>Juliet O.<Attention /></div>
+          </>
+        }
+        status={<div className="status available"><div className="status-number">5</div><div className="status-label">SPOTS</div></div>}
+      />
+
+      <OpsRow
+        time="10:30"
+        type="DIVE"
+        title={<>Power Station <DiverDownFlag /></>}
+        sub="Nabil Al-Rashid — SHORE"
+        badges={<>HOLD 2 | PU 1 | EAN 1 | GEAR 4 | NOTE</>}
+        pax={4}
+        roster={
+          <>
+            <div className="roster-line"><span className="roster-num">1.</span>Amir S.<Ean /><Ready /></div>
+            <div className="roster-line"><span className="roster-num">2.</span>Leah C.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">3.</span>Tom B.<Warn /></div>
+            <div className="roster-line"><span className="roster-num">4.</span>Renee J.<Warn /></div>
+          </>
+        }
+        status={<div className="status available"><div className="status-number">5</div><div className="status-label">SPOTS</div></div>}
+      />
+
+      <OpsRow
+        time="14:00"
+        type="DIVE"
+        title={<>Cedar Pride Wreck <AlphaFlag /></>}
+        sub="Omar Khalil — Dolphin"
+        badges={<>WAIT 3 | <span className="review">REVIEW</span> | PU 1 | EAN 4 | GEAR 4 | NOTE</>}
+        pax={20}
+        roster={
+          <>
+            <div className="roster-line"><span className="roster-num">1.</span>Larry M.<Ean /><Ready /></div>
+            <div className="roster-line"><span className="roster-num">2.</span>Shawn S.<Ean /><Ready /></div>
+            <div className="roster-line"><span className="roster-num">3.</span>Burton G.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">4.</span>Juliet O.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">5.</span>Carlton L.<Ean /><Tx /><Ready /></div>
+            <div className="roster-line"><span className="roster-num">6.</span>Henry S.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">7.</span>Woody S.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">8.</span>Despereaux P.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">9.</span>Buzz M.<Warn /></div>
+            <div className="roster-line"><span className="roster-num">10.</span>Marlowe V.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">11.</span>Abigail L.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">12.</span>Rachel S.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">13.</span>Gus G.<Ean /><Warn /></div>
+            <div className="roster-line"><span className="roster-num">14.</span>Lassiter C.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">15.</span>Karen V.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">16.</span>Mary L.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">17.</span>Chief V.<Attention /></div>
+            <div className="roster-line"><span className="roster-num">18.</span>Ewan O.<Ean /><Ready /></div>
+            <div className="roster-line"><span className="roster-num">19.</span>Declan R.<Ready /></div>
+            <div className="roster-line"><span className="roster-num">20.</span>Pierre D.<Ean /><Tx /><Ready /></div>
+          </>
+        }
+        status={<div className="status available"><div className="status-number">6</div><div className="status-label">SPOTS</div></div>}
+      />
+
+      <OpsRow
+        time="16:30"
+        type="DIVE"
+        title={<>Power Station <DiverDownFlag /></>}
+        sub="Yasmin Haddad — SHORE"
+        badges={<>HOLD 2 | GEAR 2 | NOTE</>}
+        pax={2}
+        roster={
+          <>
+            <div className="roster-line"><span className="roster-num">1.</span>Rami A.<Warn /></div>
+            <div className="roster-line"><span className="roster-num">2.</span>Lina F.<Ready /></div>
+          </>
+        }
+        status={<div className="status available"><div className="status-number">8</div><div className="status-label">SPOTS</div></div>}
+      />
+
+      <div className="legend">
+        <span><span className="legend-pill legend-ok">✓</span> Ready</span>
+        <span><span className="legend-pill legend-warn">!</span> Needs check-in</span>
+        <span><span className="legend-pill legend-attention">⚠</span> Needs attention</span>
+        <span><span className="legend-pill legend-ean">EAN</span> Nitrox</span>
+        <span><span className="legend-pill legend-tx">Tx</span> Trimix</span>
+      </div>
+
+      <div className="bottom-bar">
+        <div className="dan-box">
+          <img className="dan-logo" src="/assets/images/logos/divers-alert-network-logo.svg" alt="Divers Alert Network" />
+          <div className="dan-text">
+            <div className="dan-label">Emergency Hotline</div>
+            <div className="dan-phone">+1-919-684-9111</div>
+          </div>
+        </div>
+
+        <div>
+          <div className="message-box">
+            Please remember to bring your passport for all boat trips. You must leave a 24 hour surface interval after diving before flying.
+          </div>
+          <div className="footer-center">
+            <span>Powered by AQUORIX</span>
+            <svg className="nautilus-mark" viewBox="0 0 64 64" aria-label="AQUORIX nautilus placeholder">
+              <path d="M50 32 C50 42 42 50 32 50 C21 50 14 43 14 33 C14 23 21 16 31 16 C39 16 45 22 45 30 C45 37 40 42 33 42 C27 42 23 38 23 33 C23 28 27 24 32 24 C36 24 39 27 39 31 C39 34 36 37 33 37 C30 37 28 35 28 32 C28 30 30 28 32 28" fill="none" stroke="#0a6c9b" strokeWidth="5" strokeLinecap="round" />
+              <circle cx="32" cy="32" r="27" fill="none" stroke="#248dc1" strokeWidth="3" />
+            </svg>
+          </div>
+        </div>
+
+        <div className="qr-area">
+          <div className="qr-text">SCAN TO REGISTER<span>Forms • Waivers • Updates</span></div>
+          <div className="qr-box" aria-label="QR code placeholder"></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default OpsBoardApp;

@@ -1,0 +1,1968 @@
+/*
+  Product: AQUORIX
+  File: App.tsx
+  Path: /Users/larrymclean/CascadeProjects/aquorix-frontend/widget-embed/src/App.tsx
+
+  Description:
+  Phase 9 embeddable scheduler widget and preview checkout experience.
+  Renders a destination-local dive schedule from legacy JSON, allows
+  itinerary building, maintains available vs waitlist separation,
+  prepares encoded payload handoff to checkout, renders a preview-mode
+  checkout screen from aqx_payload, captures customer details, and
+  assembles a pre-payment booking package for backend handoff.
+
+  Author: ChatGPT (Lead Systems Architect) + Larry McLean
+  Created: 2026-03-05
+  Version: 1.4.0
+
+  Last Updated: 2026-03-09
+  Status: ACTIVE
+
+  Intellectual Property Notice:
+  This file is part of the proprietary AQUORIX platform.
+  All code, comments, and structural documentation are protected IP.
+  Header documentation must remain append-only. Never overwrite history.
+
+  Change Log (append-only):
+
+    - 2026-03-05 - v1.0.0
+      Initial widget shell:
+      - Fetch legacy schedule JSON
+      - Render raw preview for parity plumbing verification
+
+    - 2026-03-05 - v1.0.1
+      - Fix TypeScript build error by tightening schedule typing
+
+    - 2026-03-05 - v1.0.2
+      - Add JSON length + scroll hint to remove truncated preview ambiguity
+
+    - 2026-03-06 - v1.1.0
+      Initial interactive widget UI:
+      - Schedule grid rendering
+      - Itinerary add/remove
+      - Available vs waitlist separation
+      - Commit redirect seam with encoded payload
+
+    - 2026-03-07 - v1.2.0
+      Schedule navigation and chronology improvements:
+      - Destination-local rolling seven-day schedule view
+      - Calendar-week navigation
+      - Correct Monday alignment for first calendar week
+      - Schedule header/body refactor using visible date columns
+      - Destination timezone support
+      - Stable isoDate itinerary field
+      - Chronological itinerary sorting
+      - Rebuilt dive-day numbering logic
+      - Improved itinerary accounting and waitlist UI
+
+    - 2026-03-07 - v1.2.1
+      Data safety improvements:
+      - Harden localStorage itinerary restoration
+      - Runtime validation of saved itinerary items
+      - Prevent stale pre-isoDate entries corrupting chronology
+
+    - 2026-03-08 - v1.3.0
+      Navigation and header UX refinement:
+      - Removed month navigation controls
+      - Simplified to Previous Week / Next Week navigation
+      - Cleaned orphaned month logic and helper functions
+      - Improved header layout and trip summary placement
+
+    - 2026-03-08 - v1.3.1
+      Checkout preview routing and payload schema:
+      - Added preview-mode checkout rendering inside App.tsx
+      - Added aqx_payload decode helper and checkout route detection
+      - Expanded widget handoff payload to schema v1
+      - Added operator display, timezone, currency, chargeable item,
+        waitlist item, discount, subtotal, and total payload fields
+      - Corrected Book Now redirect to embed.html preview shell
+
+    - 2026-03-09 - v1.4.0
+      Checkout customer capture milestone:
+      - Added Customer Details card to checkout preview
+      - Added customer fields for first name, last name, email,
+        phone, country, and special notes
+      - Added Continue to Payment action for pre-payment testing
+      - Added checkout submission package assembly and console logging
+      - Verified end-to-end browser-side booking package structure
+*/
+
+import { useEffect, useMemo, useState } from "react"
+import { fetchLegacySchedule } from "./lib/scheduleProvider"
+import type { LegacyScheduleRow, ScheduleJson } from "./lib/scheduleProvider"
+import type { ItineraryItem, ItineraryPayload } from "./lib/itineraryTypes"
+
+const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const
+const LS_KEY = "aqx_widget_itinerary_v1"
+
+type ViewMode = "rolling_today" | "calendar_week"
+
+function getTimeZoneDateParts(date: Date, timeZone: string): { year: number; month: number; day: number } {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+
+  const parts = formatter.formatToParts(date)
+
+  const year = Number(parts.find((p) => p.type === "year")?.value)
+  const month = Number(parts.find((p) => p.type === "month")?.value)
+  const day = Number(parts.find((p) => p.type === "day")?.value)
+
+  return { year, month, day }
+}
+
+function getIsoDateInTimeZone(date: Date, timeZone: string): string {
+  const { year, month, day } = getTimeZoneDateParts(date, timeZone)
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+}
+
+function getDateFromIso(isoDate: string): Date {
+  return new Date(`${isoDate}T12:00:00Z`)
+}
+
+function addDaysToIso(isoDate: string, days: number): string {
+  const d = getDateFromIso(isoDate)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function getWeekdayNameFromIso(isoDate: string): (typeof DAYS_ORDER)[number] {
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "long",
+  }).format(getDateFromIso(isoDate))
+
+  return weekday as (typeof DAYS_ORDER)[number]
+}
+
+function formatDateLabelFromIso(isoDate: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+  }).format(getDateFromIso(isoDate))
+}
+
+function formatHeaderLabelFromIso(isoDate: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  }).format(getDateFromIso(isoDate))
+}
+
+function getRollingWindowDates(startIsoDate: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => addDaysToIso(startIsoDate, i))
+}
+
+function getMondayOnOrBeforeIso(isoDate: string): string {
+  const d = getDateFromIso(isoDate)
+  const day = d.getUTCDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setUTCDate(d.getUTCDate() + diff)
+  return d.toISOString().slice(0, 10)
+}
+
+function getMondayOnOrAfterIso(isoDate: string): string {
+  const d = getDateFromIso(isoDate)
+  const day = d.getUTCDay()
+  const daysUntilMonday = day === 1 ? 0 : day === 0 ? 1 : 8 - day
+  d.setUTCDate(d.getUTCDate() + daysUntilMonday)
+  return d.toISOString().slice(0, 10)
+}
+
+function getCalendarWeekDates(anchorIsoDate: string): string[] {
+  const monday = getMondayOnOrBeforeIso(anchorIsoDate)
+  return Array.from({ length: 7 }, (_, i) => addDaysToIso(monday, i))
+}
+
+function makeItemId(day: string, time: string, name: string): string {
+  return `${day}__${time}__${name}`.replace(/\s+/g, "_").toLowerCase()
+}
+
+function safeLoadItinerary(): ItineraryItem[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    if (!raw) return []
+
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+
+    return parsed.filter((item): item is ItineraryItem => {
+      return !!item
+        && typeof item.id === "string"
+        && typeof item.kind === "string"
+        && (item.kind === "available" || item.kind === "waitlist")
+        && typeof item.day === "string"
+        && typeof item.isoDate === "string"
+        && typeof item.dateLabel === "string"
+        && typeof item.time === "string"
+        && typeof item.name === "string"
+        && typeof item.entryType === "string"
+    })
+  } catch {
+    return []
+  }
+}
+
+function safeSaveItinerary(items: ItineraryItem[]) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(items))
+  } catch {
+    // ignore (storage may be blocked)
+  }
+}
+
+function getCurrencyMinorUnitDivisor(currency: string): number {
+  const upper = String(currency || "").trim().toUpperCase()
+
+  switch (upper) {
+    case "JOD":
+      return 1000
+    default:
+      return 100
+  }
+}
+
+function formatMinorCurrency(amountMinor: number, currency: string): string {
+  const upperCurrency = String(currency || "").trim().toUpperCase()
+  const majorAmount = amountMinor / getCurrencyMinorUnitDivisor(upperCurrency)
+
+  return `${upperCurrency} ${majorAmount.toFixed(2)}`
+}
+
+function decodeCheckoutPayloadFromUrl(): ItineraryPayload | null {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    const encoded = params.get("aqx_payload")
+    if (!encoded) return null
+
+    const json = decodeURIComponent(escape(atob(decodeURIComponent(encoded))))
+    return JSON.parse(json) as ItineraryPayload
+  } catch {
+    return null
+  }
+}
+
+type AppProps = {
+  destinationTimeZone: string
+}
+
+type CheckoutSessionQuote = {
+  checkoutUrl: string
+  ledger: {
+    currency: string
+    amountMinor: number
+    amountDisplay: string
+  }
+  charge: {
+    currency: string
+    amountMinor: number
+    amountDisplay: string
+  }
+  fx: {
+    rate: number
+    source: string
+  }
+}
+
+export default function App({ destinationTimeZone }: AppProps) {
+  const [data, setData] = useState<ScheduleJson | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [itinerary, setItinerary] = useState<ItineraryItem[]>(() => safeLoadItinerary())
+
+  const [minDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), destinationTimeZone))
+  const [viewMode, setViewMode] = useState<ViewMode>("rolling_today")
+  const [anchorDate, setAnchorDate] = useState<string>(() => getIsoDateInTimeZone(new Date(), destinationTimeZone))
+
+  const [arrivalDate, setArrivalDate] = useState<string>(minDate)
+  const [departureDate, setDepartureDate] = useState<string>(() => addDaysToIso(minDate, 6))
+  const [diverCount, setDiverCount] = useState<number>(1)
+
+  const isCheckoutRoute = useMemo(() => {
+    if (typeof window === "undefined") return false
+    const params = new URLSearchParams(window.location.search)
+    return params.get("view") === "checkout"
+  }, [])
+
+  const checkoutPayload = useMemo(() => {
+    if (!isCheckoutRoute) return null
+    return decodeCheckoutPayloadFromUrl()
+  }, [isCheckoutRoute])
+
+    const [customerFirstName, setCustomerFirstName] = useState("")
+    const [customerLastName, setCustomerLastName] = useState("")
+    const [customerEmail, setCustomerEmail] = useState("")
+    const [customerPhone, setCustomerPhone] = useState("")
+    const [customerCountry, setCustomerCountry] = useState("")
+    const [customerNotes, setCustomerNotes] = useState("")
+    const [checkoutSessionQuote, setCheckoutSessionQuote] = useState<CheckoutSessionQuote | null>(null)
+    const [isPreparingStripeCheckout, setIsPreparingStripeCheckout] = useState(false)
+
+  useEffect(() => {
+    const safeArrival = arrivalDate < minDate ? minDate : arrivalDate
+
+    if (arrivalDate !== safeArrival) {
+      setArrivalDate(safeArrival)
+      return
+    }
+
+    setViewMode("rolling_today")
+    setAnchorDate(safeArrival)
+  }, [arrivalDate, minDate])
+
+  useEffect(() => {
+    if (departureDate < arrivalDate) {
+      setDepartureDate(arrivalDate)
+    }
+  }, [arrivalDate, departureDate])
+
+  const visibleDates = useMemo(() => {
+    return viewMode === "rolling_today"
+      ? getRollingWindowDates(anchorDate)
+      : getCalendarWeekDates(anchorDate)
+  }, [viewMode, anchorDate])
+
+  function handleNextWeek() {
+    const nextAnchorDate =
+      viewMode === "rolling_today"
+        ? getMondayOnOrAfterIso(anchorDate)
+        : addDaysToIso(anchorDate, 7)
+
+    setViewMode("calendar_week")
+    setAnchorDate(nextAnchorDate)
+  }
+
+  function handlePreviousWeek() {
+    const previousAnchorDate =
+      viewMode === "rolling_today"
+        ? addDaysToIso(anchorDate, -7)
+        : addDaysToIso(anchorDate, -7)
+
+    if (previousAnchorDate <= minDate) {
+      setViewMode("rolling_today")
+      setAnchorDate(minDate)
+      return
+    }
+
+    setViewMode("calendar_week")
+    setAnchorDate(previousAnchorDate)
+  }
+
+  const visibleDateHeaders = useMemo(() => {
+    return visibleDates.map((isoDate) => ({
+      isoDate,
+      weekday: getWeekdayNameFromIso(isoDate),
+      headerLabel: formatHeaderLabelFromIso(isoDate),
+      dateLabel: formatDateLabelFromIso(isoDate),
+    }))
+  }, [visibleDates])
+
+  const scheduleRangeLabel = useMemo(() => {
+    if (!visibleDates.length) return ""
+
+    const startIso = visibleDates[0]
+    const endIso = visibleDates[visibleDates.length - 1]
+
+    const start = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+    }).format(getDateFromIso(startIso))
+
+    const end = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(getDateFromIso(endIso))
+
+    return `${start} – ${end}`
+  }, [visibleDates])
+
+  const selectedTripLabel = useMemo(() => {
+    const start = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(getDateFromIso(arrivalDate))
+
+    const end = new Intl.DateTimeFormat("en-US", {
+      timeZone: "UTC",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }).format(getDateFromIso(departureDate))
+
+    return `${start} – ${end}`
+  }, [arrivalDate, departureDate])
+
+  useEffect(() => {
+    safeSaveItinerary(itinerary)
+  }, [itinerary])
+
+  useEffect(() => {
+    if (isCheckoutRoute) return
+    let mounted = true
+
+    fetchLegacySchedule(anchorDate)
+      .then((json) => {
+        if (!mounted) return
+        setData(json)
+      })
+      .catch((err: any) => {
+        if (!mounted) return
+        setError(String(err?.message || err))
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [isCheckoutRoute, anchorDate])
+
+  const scheduleRows: LegacyScheduleRow[] = useMemo(() => {
+    return data?.schedule || []
+  }, [data])
+
+  function addToItinerary(day: (typeof DAYS_ORDER)[number], isoDate: string, dateLabel: string, row: LegacyScheduleRow) {
+    const cell = row.days[day]
+    if (!cell) return
+
+    const id = makeItemId(`${isoDate}_${day}`, row.time, cell.name)
+    const kind: ItineraryItem["kind"] = cell.spaceAvail > 0 ? "available" : "waitlist"
+
+    setItinerary((prev) => {
+      if (prev.some((x) => x.id === id)) return prev
+      return [
+        ...prev,
+        {
+          id,
+          sessionId: cell.sessionId || id,
+          unitPriceMinor: cell.unitPriceMinor || 4500,
+          currency: cell.currency || "USD",
+          kind,
+          day,
+          isoDate,
+          time: row.time,
+          name: cell.name,
+          dateLabel,
+          entryType: cell.entryType,
+          passengerCount: diverCount,
+        },
+      ]
+    })
+  }
+
+  function removeFromItinerary(id: string) {
+    setItinerary((prev) => prev.filter((x) => x.id !== id))
+  }
+
+  function clearItinerary() {
+    setItinerary([])
+  }
+
+  function commitItinerary() {
+    const available = itinerary.filter((x) => x.kind === "available")
+    const waitlist = itinerary.filter((x) => x.kind === "waitlist")
+
+    const payloadCurrency =
+      available[0]?.currency ||
+      waitlist[0]?.currency ||
+      "JOD"
+
+    const payloadMinorUnitDivisor = getCurrencyMinorUnitDivisor(payloadCurrency)
+
+    const subtotalMinor = Math.round(itineraryTotal * payloadMinorUnitDivisor)
+    const promoDiscountMinor = Math.round(promoDiscount * payloadMinorUnitDivisor)
+    const greenFinsDiscountMinor = Math.round(greenFinsDiscount * payloadMinorUnitDivisor)
+    const totalMinor = Math.round(finalTotal * payloadMinorUnitDivisor)
+
+    const payload: ItineraryPayload = {
+      schemaVersion: "1.0",
+      operatorSlug: "blue-current-divers",
+      operatorDisplayName: "Blue Current Divers",
+      timezone: destinationTimeZone,
+      currency: payloadCurrency,
+      createdAtIso: new Date().toISOString(),
+      chargeableItems: available.map((x) => ({
+        itemId: x.id,
+        sessionId: x.sessionId,
+        sessionKey: `${x.isoDate}__${x.time}__${x.name}`.replace(/\s+/g, "_").toLowerCase(),
+        soldItemLabel: `${x.isoDate} ${x.time} ${x.name} (${x.entryType})`,
+        day: x.day,
+        isoDate: x.isoDate,
+        dateLabel: x.dateLabel,
+        time: x.time,
+        name: x.name,
+        entryType: x.entryType,
+        pax: x.passengerCount,
+        unitPriceMinor: x.unitPriceMinor,
+        lineTotalMinor: x.unitPriceMinor * x.passengerCount,
+        status: "AVAILABLE",
+      })),
+      waitlistItems: waitlist.map((x) => ({
+        itemId: x.id,
+        sessionId: x.sessionId,
+        sessionKey: `${x.isoDate}__${x.time}__${x.name}`.replace(/\s+/g, "_").toLowerCase(),
+        soldItemLabel: `${x.isoDate} ${x.time} ${x.name} (${x.entryType})`,
+        day: x.day,
+        isoDate: x.isoDate,
+        dateLabel: x.dateLabel,
+        time: x.time,
+        name: x.name,
+        entryType: x.entryType,
+        pax: x.passengerCount,
+        status: "WAITLIST",
+      })),
+      discounts: {
+        promo: {
+          code: appliedPromoCode,
+          amountMinor: promoDiscountMinor,
+        },
+        greenFins: {
+          agreed: greenFinsEnabled,
+          amountMinor: greenFinsDiscountMinor,
+        },
+      },
+      subtotalMinor,
+      totalMinor,
+    }
+
+    const encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))))
+
+    window.location.assign(`/embed.html?view=checkout&aqx_payload=${encoded}`)
+  }
+
+  const availableCount = itinerary.filter((x) => x.kind === "available").length
+  const waitlistCount = itinerary.filter((x) => x.kind === "waitlist").length
+
+  const availablePassengerCount = itinerary
+    .filter((x) => x.kind === "available")
+    .reduce((sum, x) => sum + x.passengerCount, 0)
+
+  const itineraryCurrency =
+    itinerary.find((x) => x.kind === "available")?.currency ||
+    itinerary[0]?.currency ||
+    "JOD"
+
+  const itineraryMinorUnitDivisor = getCurrencyMinorUnitDivisor(itineraryCurrency)
+
+  const itineraryTotal = itinerary
+    .filter((x) => x.kind === "available")
+    .reduce((sum, x) => sum + ((x.unitPriceMinor / itineraryMinorUnitDivisor) * x.passengerCount), 0)
+
+  const [promoCodeInput, setPromoCodeInput] = useState("")
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null)
+  const [promoError, setPromoError] = useState<string | null>(null)
+
+  const [greenFinsEnabled, setGreenFinsEnabled] = useState(false)
+  const [greenFinsModalOpen, setGreenFinsModalOpen] = useState(false)
+  const [greenFinsAgreedAt, setGreenFinsAgreedAt] = useState<string | null>(null)
+
+  const promoDiscount = useMemo(() => {
+    if (appliedPromoCode === "FALL10") {
+      return itineraryTotal * 0.1
+    }
+    return 0
+  }, [appliedPromoCode, itineraryTotal])
+
+  const postPromoSubtotal = Math.max(0, itineraryTotal - promoDiscount)
+
+  const greenFinsDiscount = useMemo(() => {
+    if (greenFinsEnabled) {
+      return postPromoSubtotal * 0.1
+    }
+    return 0
+  }, [greenFinsEnabled, postPromoSubtotal])
+
+  const finalTotal = Math.max(0, postPromoSubtotal - greenFinsDiscount)
+
+  const costPerDive = availablePassengerCount > 0 ? finalTotal / availablePassengerCount : 0
+
+  const confirmedDiveSummary =
+    availablePassengerCount > 0
+      ? `${availablePassengerCount} confirmed ${availablePassengerCount === 1 ? "seat" : "seats"} across ${availableCount} ${availableCount === 1 ? "dive" : "dives"} • ${itineraryCurrency} ${costPerDive.toFixed(2)} per diver per dive`
+      : ""
+
+  function applyPromoCode() {
+    const normalized = promoCodeInput.trim()
+
+    if (!normalized) {
+      setPromoError("Enter a promo code.")
+      setAppliedPromoCode(null)
+      return
+    }
+
+    if (normalized !== "FALL10") {
+      setPromoError("Invalid promo code.")
+      setAppliedPromoCode(null)
+      return
+    }
+
+    setAppliedPromoCode(normalized)
+    setPromoError(null)
+  }
+
+  function clearPromoCode() {
+    setPromoCodeInput("")
+    setAppliedPromoCode(null)
+    setPromoError(null)
+  }
+
+  function openGreenFinsModal() {
+    setGreenFinsModalOpen(true)
+  }
+
+  function closeGreenFinsModal() {
+    setGreenFinsModalOpen(false)
+  }
+
+  function applyGreenFins() {
+    setGreenFinsEnabled(true)
+    setGreenFinsAgreedAt(new Date().toISOString())
+    setGreenFinsModalOpen(false)
+  }
+
+  const sortedItinerary = useMemo(() => {
+    return [...itinerary].sort((a, b) => {
+      if (a.isoDate !== b.isoDate) return a.isoDate.localeCompare(b.isoDate)
+      if (a.time !== b.time) return a.time.localeCompare(b.time)
+      return a.name.localeCompare(b.name)
+    })
+  }, [itinerary])
+
+  // Dive Day numbering (divers think in dive days, not weekdays)
+  const diveDayMap = useMemo(() => {
+    const uniqueDates = Array.from(new Set(sortedItinerary.map((x) => x.isoDate)))
+    const map: Record<string, number> = {}
+
+    uniqueDates.forEach((isoDate, i) => {
+      map[isoDate] = i + 1
+    })
+
+    return map
+  }, [sortedItinerary])
+
+  function buildPendingBookingRequest() {
+    if (!checkoutPayload) return null
+
+    return {
+      submittedAtIso: new Date().toISOString(),
+      bookingSource: "widget-embed",
+      customer: {
+        firstName: customerFirstName.trim(),
+        lastName: customerLastName.trim(),
+        email: customerEmail.trim(),
+        phone: customerPhone.trim(),
+        country: customerCountry.trim(),
+        notes: customerNotes.trim(),
+      },
+      booking: checkoutPayload,
+    }
+  }
+
+    async function handleCheckoutContinue() {
+    if (checkoutSessionQuote && checkoutSessionQuote.checkoutUrl) {
+      window.location.href = checkoutSessionQuote.checkoutUrl
+      return
+    }
+
+    const pendingBookingRequest = buildPendingBookingRequest()
+
+    if (!pendingBookingRequest) {
+      console.error("[AQUORIX] Checkout payload missing.")
+      window.alert("Checkout payload missing.")
+      return
+    }
+
+    setIsPreparingStripeCheckout(true)
+
+    try {
+      const response = await fetch("http://localhost:3001/api/v1/widget/bookings/pending", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(pendingBookingRequest),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.ok) {
+        console.error("[AQUORIX] Backend booking error", data)
+        window.alert(data && data.error ? data.error : "Booking POST failed.")
+        return
+      }
+
+      console.log("[AQUORIX] Pending booking created", data)
+
+      const bookingId = data.bookingId
+
+      if (!bookingId) {
+        console.error("[AQUORIX] bookingId missing from backend response")
+        window.alert("Booking created but bookingId missing.")
+        return
+      }
+
+      const checkoutResponse = await fetch(
+        `http://localhost:3001/api/v1/widget/bookings/${bookingId}/checkout-session`,
+        {
+          method: "POST",
+        }
+      )
+
+      const checkoutData = await checkoutResponse.json()
+
+      if (!checkoutResponse.ok || !checkoutData.ok) {
+        console.error("[AQUORIX] Checkout session creation failed", checkoutData)
+        window.alert(checkoutData && checkoutData.error ? checkoutData.error : "Checkout session creation failed.")
+        return
+      }
+
+      const checkoutUrl = checkoutData.checkoutUrl
+
+      if (!checkoutUrl) {
+        console.error("[AQUORIX] checkoutUrl missing", checkoutData)
+        window.alert("Checkout URL missing.")
+        return
+      }
+
+      setCheckoutSessionQuote({
+        checkoutUrl,
+        ledger: {
+          currency: checkoutData.ledger.currency,
+          amountMinor: checkoutData.ledger.amountMinor,
+          amountDisplay: checkoutData.ledger.amountDisplay,
+        },
+        charge: {
+          currency: checkoutData.charge.currency,
+          amountMinor: checkoutData.charge.amountMinor,
+          amountDisplay: checkoutData.charge.amountDisplay,
+        },
+        fx: {
+          rate: checkoutData.fx.rate,
+          source: checkoutData.fx.source,
+        },
+      })
+    } catch (error) {
+      console.error("[AQUORIX] Booking POST failed", error)
+      window.alert("Booking POST failed. See console.")
+    } finally {
+      setIsPreparingStripeCheckout(false)
+    }
+  }
+
+  if (isCheckoutRoute) {
+    return (
+      <div
+        className="aqx-widget-shell"
+        style={{
+          fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+          maxWidth: 960,
+          margin: "0 auto",
+          padding: 16,
+          background: "transparent"
+        }}
+      >
+        <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
+          Checkout
+        </div>
+
+        {!checkoutPayload && (
+          <div
+            style={{
+              padding: 12,
+              background: "#ffecec",
+              border: "1px solid #ffb3b3",
+              borderRadius: 8,
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Checkout payload failed to load</div>
+            <div>aqx_payload is missing or invalid.</div>
+          </div>
+        )}
+
+        {checkoutPayload && (
+          <div style={{ display: "grid", gap: 14 }}>
+            <div
+              style={{
+                border: "1px solid #e3e6ea",
+                borderRadius: 12,
+                padding: 16,
+                background: "#ffffff",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 18,
+                }}
+              >
+                <div
+                  style={{
+                    width: 76,
+                    height: 76,
+                    borderRadius: 12,
+                    background: "#0f172a",
+                    color: "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: 28,
+                    flexShrink: 0,
+                  }}
+                >
+                  {(checkoutPayload.operatorDisplayName || "O").charAt(0).toUpperCase()}
+                </div>
+
+                <div
+                  style={{
+                    minWidth: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    height: 76,
+                    paddingTop: 2,
+                    paddingBottom: 2,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 800,
+                      lineHeight: 1.1,
+                      margin: 0,
+                    }}
+                  >
+                    {checkoutPayload.operatorDisplayName}
+                  </div>
+
+                  <div style={{ fontSize: 13, color: "#5f6b76", lineHeight: 1.2 }}>
+                    Operator Slug: {checkoutPayload.operatorSlug}
+                  </div>
+
+                  <div style={{ fontSize: 13, color: "#5f6b76", lineHeight: 1.2 }}>
+                    Timezone: {checkoutPayload.timezone}
+                  </div>
+
+                  <div style={{ fontSize: 13, color: "#5f6b76", lineHeight: 1.2 }}>
+                    Currency: {checkoutPayload.currency}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                border: "1px solid #e3e6ea",
+                borderRadius: 12,
+                padding: 16,
+                background: "#ffffff",
+              }}
+            >
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+                Customer Details
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                }}
+              >
+                <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  First Name
+                  <input
+                    type="text"
+                    value={customerFirstName}
+                    onChange={(e) => setCustomerFirstName(e.target.value)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  Last Name
+                  <input
+                    type="text"
+                    value={customerLastName}
+                    onChange={(e) => setCustomerLastName(e.target.value)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  Email
+                  <input
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  Phone
+                  <input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  />
+                </label>
+
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#334155",
+                    gridColumn: "1 / -1",
+                  }}
+                >
+                  Country
+                  <input
+                    type="text"
+                    value={customerCountry}
+                    onChange={(e) => setCustomerCountry(e.target.value)}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  />
+                </label>
+
+                <label
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#334155",
+                    gridColumn: "1 / -1",
+                  }}
+                >
+                  Special Notes
+                  <textarea
+                    value={customerNotes}
+                    onChange={(e) => setCustomerNotes(e.target.value)}
+                    rows={4}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                      resize: "vertical",
+                      fontFamily: "inherit",
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div
+              style={{
+                border: "1px solid #e3e6ea",
+                borderRadius: 12,
+                padding: 16,
+                background: "#ffffff",
+              }}
+            >
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+                Chargeable Items
+              </div>
+
+              {checkoutPayload.chargeableItems.length === 0 && (
+                <div style={{ color: "#5f6b76" }}>No chargeable items in payload.</div>
+              )}
+
+              {checkoutPayload.chargeableItems.length > 0 && (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Sold Item</th>
+                      <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>PAX</th>
+                      <th style={{ textAlign: "right", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {checkoutPayload.chargeableItems.map((item) => (
+                      <tr key={item.itemId}>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>
+                          <div style={{ fontWeight: 700 }}>{item.name}</div>
+                          <div style={{ fontSize: 12, color: "#5f6b76" }}>{item.soldItemLabel}</div>
+                        </td>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{item.pax}</td>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4", textAlign: "right", whiteSpace: "nowrap" }}>
+                          {formatMinorCurrency(item.lineTotalMinor, checkoutPayload.currency)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            <div
+              style={{
+                border: "1px solid #e3e6ea",
+                borderRadius: 12,
+                padding: 16,
+                background: "#ffffff",
+              }}
+            >
+              <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+                Waitlist Items
+              </div>
+
+              {checkoutPayload.waitlistItems.length === 0 && (
+                <div style={{ color: "#5f6b76" }}>No waitlist items.</div>
+              )}
+
+              {checkoutPayload.waitlistItems.length > 0 && (
+                <div style={{ display: "grid", gap: 8 }}>
+                  {checkoutPayload.waitlistItems.map((item) => (
+                    <div
+                      key={item.itemId}
+                      style={{
+                        padding: 10,
+                        border: "1px solid #e3e6ea",
+                        borderRadius: 10,
+                        background: "#fafafa",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700 }}>{item.name}</div>
+                      <div style={{ fontSize: 12, color: "#5f6b76" }}>{item.soldItemLabel}</div>
+                      <div style={{ fontSize: 12, color: "#5f6b76", marginTop: 4 }}>
+                        PAX {item.pax} - WAITLIST only - not charged
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                border: "1px solid #e3e6ea",
+                borderRadius: 12,
+                padding: 16,
+                background: "#ffffff",
+              }}
+            >
+                            <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+                Pricing Summary
+              </div>
+
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <span>Subtotal</span>
+                  <span>{formatMinorCurrency(checkoutPayload.subtotalMinor, checkoutPayload.currency)}</span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <span>Promo Discount {checkoutPayload.discounts.promo.code ? `(${checkoutPayload.discounts.promo.code})` : ""}</span>
+                  <span>-{formatMinorCurrency(checkoutPayload.discounts.promo.amountMinor, checkoutPayload.currency)}</span>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <span>Green Fins Discount</span>
+                  <span>-{formatMinorCurrency(checkoutPayload.discounts.greenFins.amountMinor, checkoutPayload.currency)}</span>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    marginTop: 8,
+                    paddingTop: 10,
+                    borderTop: "2px solid #d7dde3",
+                    fontWeight: 900,
+                    fontSize: 18,
+                  }}
+                >
+                  <span>Total</span>
+                  <span>{formatMinorCurrency(checkoutPayload.totalMinor, checkoutPayload.currency)}</span>
+                </div>
+              </div>
+
+              {checkoutSessionQuote && (
+                <div
+                  style={{
+                    marginTop: 16,
+                    padding: 12,
+                    border: "1px solid #d7dde3",
+                    borderRadius: 10,
+                    background: "#f8fafc",
+                    display: "grid",
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                    <span>Dive Total</span>
+                    <span style={{ fontWeight: 700 }}>
+                      {checkoutSessionQuote.ledger.amountDisplay} {checkoutSessionQuote.ledger.currency}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                    <span>Card Charge</span>
+                    <span style={{ fontWeight: 800 }}>
+                      ${checkoutSessionQuote.charge.amountDisplay} {checkoutSessionQuote.charge.currency}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12, color: "#5f6b76" }}>
+                    <span>Exchange Rate</span>
+                    <span>
+                      1 {checkoutSessionQuote.ledger.currency} = ${checkoutSessionQuote.fx.rate.toFixed(2)} {checkoutSessionQuote.charge.currency}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: 12, color: "#5f6b76" }}>
+                    Your card will be charged in {checkoutSessionQuote.charge.currency} by AQUORIX. Your bank may apply additional foreign transaction fees.
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={handleCheckoutContinue}
+                  disabled={isPreparingStripeCheckout}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #075c31",
+                    background: "#e6f4ec",
+                    color: "#075c31",
+                    cursor: isPreparingStripeCheckout ? "not-allowed" : "pointer",
+                    fontWeight: 800,
+                    whiteSpace: "nowrap",
+                    opacity: isPreparingStripeCheckout ? 0.7 : 1,
+                  }}
+                >
+                  {isPreparingStripeCheckout
+                    ? "Preparing Payment..."
+                    : checkoutSessionQuote
+                      ? `Pay $${checkoutSessionQuote.charge.amountDisplay} ${checkoutSessionQuote.charge.currency} with Card`
+                      : "Review Card Charge"}
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 4,
+                textAlign: "center",
+                fontSize: 11,
+                color: "#fff",
+                letterSpacing: "0.02em",
+              }}
+            >
+              Scheduler v1.0.0 - Powered by{" "}
+              <a
+                href="https://www.aquorix.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: "#fff",
+                  textDecoration: "none",
+                  fontFamily: '"Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, sans-serif',
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                AQUORIX™
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="aqx-widget-shell" style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif" }}>
+      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+        Blue Current Divers Schedule & Itinerary Builder
+      </div>
+
+      {error && (
+        <div style={{ padding: 12, background: "#ffecec", border: "1px solid #ffb3b3", borderRadius: 8 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Schedule load failed</div>
+          <div style={{ whiteSpace: "pre-wrap" }}>{error}</div>
+        </div>
+      )}
+
+      {!error && !data && <div>Loading schedule...</div>}
+
+      {!error && data && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
+          <div className="aqx-widget-card aqx-widget-schedule-card" style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr auto 1fr",
+                alignItems: "start",
+                gap: 12,
+                marginBottom: 10,
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 700 }}>Schedule</div>
+                <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.8 }}>
+                  {scheduleRangeLabel}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#475569", marginTop: 2 }}>
+                  Trip: {selectedTripLabel}
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
+                  Time zone: {destinationTimeZone}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-end",
+                  justifyContent: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                  padding: "8px 12px",
+                  border: "1px solid #e3e6ea",
+                  borderRadius: 10,
+                  background: "#f8fafc",
+                  margin: "0 auto",
+                }}
+              >
+
+                <button
+                  type="button"
+                  onClick={handlePreviousWeek}
+                  disabled={anchorDate <= minDate}
+                  title={anchorDate <= minDate ? "Cannot go earlier than destination-local today" : "Go to previous week"}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #cfd6dd",
+                    background: anchorDate <= minDate ? "#e9ecef" : "#ffffff",
+                    color: anchorDate <= minDate ? "#7a7f87" : "#1f2933",
+                    cursor: anchorDate <= minDate ? "not-allowed" : "pointer",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Previous Week
+                </button>
+
+                <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  Arrival
+                  <input
+                    type="date"
+                    value={arrivalDate}
+                    onChange={(e) => setArrivalDate(e.target.value)}
+                    min={minDate}
+                    style={{
+                      marginTop: 4,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  Departure
+                  <input
+                    type="date"
+                    value={departureDate}
+                    onChange={(e) => setDepartureDate(e.target.value)}
+                    min={arrivalDate}
+                    style={{
+                      marginTop: 4,
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  />
+                </label>
+
+                <label style={{ display: "flex", flexDirection: "column", fontSize: 12, fontWeight: 600, color: "#334155" }}>
+                  # Divers
+                  <select
+                    value={diverCount}
+                    onChange={(e) => setDiverCount(Number(e.target.value))}
+                    style={{
+                      marginTop: 4,
+                      padding: "7px 8px",
+                      height: 30,
+                      borderRadius: 8,
+                      border: "1px solid #cfd6dd",
+                      background: "#ffffff",
+                    }}
+                  >
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map((count) => (
+                      <option key={count} value={count}>
+                        {count}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleNextWeek}
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #cfd6dd",
+                    background: "#ffffff",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Next Week
+                </button>
+
+              </div>
+
+            </div>
+
+            <div style={{ overflowX: "auto" }}>
+              <table className="aqx-widget-table aqx-widget-schedule-table" style={{ borderCollapse: "collapse", width: "100%", minWidth: 780 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea" }}>Time</th>
+                    {visibleDateHeaders.map((col) => (
+                      <th key={col.isoDate} style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea" }}>
+                        <div>{col.headerLabel}</div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {scheduleRows.map((row) => (
+                    <tr key={row.time}>
+                      <td style={{ padding: 10, borderBottom: "1px solid #f0f2f4", fontWeight: 700 }}>{row.time}</td>
+                      {visibleDateHeaders.map((col) => {
+                        const day = col.weekday
+                        const cell = row.days[day]
+
+                        if (!cell) {
+                          return <td key={col.isoDate} style={{ padding: 10, borderBottom: "1px solid #f0f2f4" }} />
+                        }
+
+                        const isFull = cell.spaceAvail <= 0
+                        const label = isFull ? "FULL" : `BOOK (${cell.spaceAvail})`
+
+                        return (
+                          <td key={col.isoDate} style={{ padding: 10, borderBottom: "1px solid #f0f2f4", verticalAlign: "top" }}>
+                            <div style={{ fontWeight: 700, marginBottom: 4 }}>{cell.name}</div>
+                            <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 8 }}>{cell.entryType}</div>
+                            <button
+                              type="button"
+                              onClick={() => addToItinerary(day, col.isoDate, col.dateLabel, row)}
+                              style={{
+                                padding: "8px 10px",
+                                borderRadius: 10,
+                                border: "1px solid #cfd6dd",
+                                background: isFull ? "#f6f7f8" : "#ffffff",
+                                cursor: "pointer",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {label}
+                            </button>
+                            {isFull && <div style={{ fontSize: 12, marginTop: 6, opacity: 0.8 }}>Adds to waitlist (no charge)</div>}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="aqx-widget-card aqx-widget-itinerary-card" style={{ border: "1px solid #e3e6ea", borderRadius: 12, padding: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+              <div style={{ fontWeight: 700 }}>Your Itinerary</div>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>
+                Available: {availableCount} | Waitlist: {waitlistCount}
+              </div>
+            </div>
+
+            {itinerary.length === 0 && <div style={{ marginTop: 10, opacity: 0.8 }}>No items yet. Click BOOK/FULL on the schedule.</div>}
+
+
+            {itinerary.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <table className="aqx-widget-table aqx-widget-itinerary-table" style={{ borderCollapse: "collapse", width: "100%" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Day No.</th>
+                      <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Day</th>
+                      <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Date</th>
+                      <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Time</th>
+                      <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Activity</th>
+                      <th style={{ textAlign: "left", padding: 10, borderBottom: "1px solid #e3e6ea", whiteSpace: "nowrap", }}># PAX</th>
+                      <th style={{ textAlign: "left", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Status</th>
+                      <th style={{ textAlign: "right", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Amount</th>
+                      <th style={{ textAlign: "right", padding: 8, borderBottom: "1px solid #e3e6ea" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedItinerary.map((item) => (
+                      <tr key={item.id} style={{ background: item.kind === "waitlist" ? "#f7f7f7" : "transparent" }}>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>
+                          {diveDayMap[item.isoDate] ?? "-"}
+                        </td>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{item.day}</td>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{item.dateLabel}</td>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>{item.time}</td>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4" }}>
+                          <div style={{ fontWeight: 700 }}>{item.name}</div>
+                          <div style={{ fontSize: 12, opacity: 0.85 }}>{item.entryType}</div>
+                        </td>
+                        <td
+                          style={{
+                            padding: 10,
+                            borderBottom: "1px solid #f0f2f4",
+                            textAlign: "left",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {item.passengerCount}
+                        </td>
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4", fontWeight: 700 }}>
+                          {item.kind === "available" ? "AVAILABLE" : "WAITLIST"}
+                        </td>
+
+                        <td
+                          style={{
+                            padding: 8,
+                            borderBottom: "1px solid #f0f2f4",
+                            textAlign: "right",
+                            whiteSpace: "nowrap",
+                            color: item.kind === "waitlist" ? "#777" : "#075c31",
+                            fontWeight: item.kind === "available" ? 700 : 500,
+                          }}
+                        >
+                          {item.kind === "available" ? formatMinorCurrency(item.unitPriceMinor * item.passengerCount, item.currency) : "WAITLIST"}
+                        </td>
+
+                        <td style={{ padding: 8, borderBottom: "1px solid #f0f2f4", textAlign: "right" }}>
+                          <button
+                            type="button"
+                            onClick={() => removeFromItinerary(item.id)}
+                            style={{ padding: "6px 10px", borderRadius: 10, border: "1px solid #cfd6dd", background: "#ffffff", cursor: "pointer" }}
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td
+                        colSpan={9}
+                        style={{
+                          padding: 0,
+                          height: 0,
+                          lineHeight: 0,
+                          borderTop: "1px solid #d7dde3",
+                        }}
+                      ></td>
+                    </tr>
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{
+                          padding: 10,
+                          fontWeight: 800,
+                        }}
+                      >
+                        <span style={{ fontSize: 12, fontWeight: 500, color: "#5f6b76" }}>
+                          Only available dives are included in checkout. Waitlist items are tracked separately and not charged.
+                        </span>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 10,
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Subtotal
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 10,
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {formatMinorCurrency(Math.round(itineraryTotal * itineraryMinorUnitDivisor), itineraryCurrency)}
+                      </td>
+                      <td></td>
+                    </tr>
+
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{
+                          padding: 10,
+                          fontWeight: 800,
+                          borderTop: "0",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <input
+                            type="text"
+                            value={promoCodeInput}
+                            onChange={(e) => setPromoCodeInput(e.target.value)}
+                            placeholder="Promo code"
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: 8,
+                              border: "1px solid #cfd6dd",
+                              width: 120,
+                            }}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={applyPromoCode}
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: 8,
+                              border: "1px solid #cfd6dd",
+                              background: "#ffffff",
+                              cursor: "pointer",
+                              fontWeight: 700,
+                            }}
+                          >
+                            Apply
+                          </button>
+
+                          {appliedPromoCode && (
+                            <span style={{ fontSize: 12, color: "#075c31", fontWeight: 700 }}>
+                              {appliedPromoCode} applied
+                            </span>
+                          )}
+
+                          {promoError && (
+                            <span style={{ fontSize: 12, color: "#b00020", fontWeight: 700 }}>
+                              {promoError}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 10,
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                          borderTop: "1px solid #d7dde3",
+                        }}
+                      >
+                        Promo Code Discount
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 10,
+                          fontWeight: 800,
+                          color: promoDiscount > 0 ? "#075c31" : "#6b7280",
+                          whiteSpace: "nowrap",
+                          borderTop: "1px solid #d7dde3",
+                        }}
+                      >
+                        -{formatMinorCurrency(Math.round(promoDiscount * itineraryMinorUnitDivisor), itineraryCurrency)}
+                      </td>
+                      <td
+                        style={{
+                          borderTop: "1px solid #d7dde3",
+                          textAlign: "right",
+                          padding: 10,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={clearPromoCode}
+                          style={{
+                            padding: "6px 8px",
+                            borderRadius: 8,
+                            border: "1px solid #cfd6dd",
+                            background: "#ffffff",
+                            cursor: "pointer",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{
+                          padding: 10,
+                          fontWeight: 800,
+                          borderTop: "1px solid #d7dde3",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            onClick={openGreenFinsModal}
+                            disabled={greenFinsEnabled}
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: 8,
+                              border: "1px solid #cfd6dd",
+                              background: greenFinsEnabled ? "#e6f4ec" : "#ffffff",
+                              cursor: greenFinsEnabled ? "not-allowed" : "pointer",
+                              fontWeight: 700,
+                              color: greenFinsEnabled ? "#075c31" : "#1f2933",
+                            }}
+                          >
+                            {greenFinsEnabled ? "Green Fins Applied (10% off)" : "Apply Green Fins"}
+                          </button>
+
+                          {greenFinsEnabled && greenFinsAgreedAt && (
+                            <span style={{ fontSize: 12, color: "#075c31", fontWeight: 700 }}>
+                              Agreed {new Date(greenFinsAgreedAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 10,
+                          fontWeight: 800,
+                          whiteSpace: "nowrap",
+                          borderTop: "1px solid #d7dde3",
+                        }}
+                      >
+                        Green Fins Discount
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 10,
+                          fontWeight: 800,
+                          color: greenFinsDiscount > 0 ? "#075c31" : "#6b7280",
+                          whiteSpace: "nowrap",
+                          borderTop: "1px solid #d7dde3",
+                        }}
+                      >
+                        -{formatMinorCurrency(Math.round(greenFinsDiscount * itineraryMinorUnitDivisor), itineraryCurrency)}
+                      </td>
+                      <td style={{ borderTop: "1px solid #d7dde3" }}></td>
+                    </tr>
+
+                    <tr style={{ background: "#e6f4ec" }}>
+                      <td
+                        colSpan={6}
+                        style={{
+                          padding: 12,
+                          borderTop: "2px solid #0a7a43",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "#075c31",
+                              textAlign: "left",
+                            }}
+                          >
+                            {confirmedDiveSummary}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={commitItinerary}
+                            disabled={availableCount === 0}
+                            title={availableCount === 0 ? "Add at least one available dive to proceed" : "Proceed to checkout"}
+                            style={{
+                              padding: "8px 12px",
+                              borderRadius: 10,
+                              border: availableCount === 0 ? "1px solid #cfd6dd" : "1px solid #075c31",
+                              background: availableCount === 0 ? "#e9ecef" : "#dff5e8",
+                              color: availableCount === 0 ? "#7a7f87" : "#075c31",
+                              cursor: availableCount === 0 ? "not-allowed" : "pointer",
+                              fontWeight: 900,
+                              boxShadow: availableCount === 0 ? "none" : "0 1px 2px rgba(0,0,0,0.08)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Book Now
+                          </button>
+                        </div>
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 12,
+                          fontWeight: 900,
+                          fontSize: 15,
+                          color: "#075c31",
+                          borderTop: "2px solid #075c31",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Total
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "right",
+                          padding: 12,
+                          fontWeight: 900,
+                          fontSize: 16,
+                          color: "#075c31",
+                          borderTop: "2px solid #075c31",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {formatMinorCurrency(Math.round(finalTotal * itineraryMinorUnitDivisor), itineraryCurrency)}
+                      </td>
+                      <td
+                        style={{
+                          borderTop: "2px solid #075c31",
+                          padding: 12,
+                          textAlign: "right",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={clearItinerary}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 10,
+                            border: "1px solid #cfd6dd",
+                            background: "#ffffff",
+                            cursor: "pointer",
+                            fontWeight: 800,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Clear
+                        </button>
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                <div style={{ fontSize: 12, marginTop: 8, color: "#5f6b76" }}>
+                  {availableCount === 0
+                    ? "Add at least one available dive to proceed."
+                    : ""}
+                </div>
+
+                {greenFinsModalOpen && (
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="green-fins-title"
+                    style={{
+                      position: "fixed",
+                      inset: 0,
+                      background: "rgba(0, 0, 0, 0.45)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 20,
+                      zIndex: 1000,
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: "#ffffff",
+                        borderRadius: 12,
+                        width: "100%",
+                        maxWidth: 760,
+                        maxHeight: "85vh",
+                        overflowY: "auto",
+                        padding: 20,
+                        boxShadow: "0 12px 32px rgba(0, 0, 0, 0.2)",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                        <h3 id="green-fins-title" style={{ margin: 0 }}>
+                          Green Fins Responsible Diving Agreement
+                        </h3>
+
+                        <button
+                          type="button"
+                          onClick={closeGreenFinsModal}
+                          aria-label="Close Green Fins agreement"
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            border: "1px solid #cfd6dd",
+                            background: "#ffffff",
+                            cursor: "pointer",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <p style={{ marginTop: 0 }}>
+                        By selecting this option, I commit to following Green Fins environmental principles to protect coral reefs and marine life during my dive(s).
+                      </p>
+
+                      <p>
+                        This operator supports Green Fins principles to protect our reefs.
+                      </p>
+
+                      <div style={{ marginBottom: 16, lineHeight: 1.55 }}>
+                        <div>Perfect my buoyancy to avoid contact with the reef</div>
+                        <div>Keep all equipment secured and streamlined</div>
+                        <div>Never touch, stand on, or damage coral</div>
+                        <div>Never chase, harass, or feed marine life</div>
+                        <div>Maintain a respectful distance from all sea creatures</div>
+                        <div>Never collect shells, coral, or marine souvenirs</div>
+                        <div>Use reef-safe sunscreen only</div>
+                        <div>Properly dispose of all waste</div>
+                        <div>Follow my dive guide's environmental instructions</div>
+                        <div>Help protect our oceans for future generations</div>
+                      </div>
+
+                      <div style={{ marginBottom: 16, lineHeight: 1.55 }}>
+                        <div>I understand that:</div>
+                        <div>- These practices protect fragile marine ecosystems</div>
+                        <div>- My operator follows Green Fins standards</div>
+                        <div>- This discount rewards responsible diving behavior</div>
+                        <div>- I can take the free Green Fins Diver e-Course at greenfins.net</div>
+                      </div>
+
+                      <div style={{ fontSize: 12, color: "#5f6b76", marginBottom: 16 }}>
+                        By continuing, you confirm that you have read and agree to follow Green Fins principles for this booking.
+                      </div>
+
+                      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          onClick={closeGreenFinsModal}
+                          style={{
+                            padding: "10px 12px",
+                            borderRadius: 10,
+                            border: "1px solid #cfd6dd",
+                            background: "#ffffff",
+                            cursor: "pointer",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Cancel
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={applyGreenFins}
+                          style={{
+                            padding: "10px 12px",
+                            borderRadius: 10,
+                            border: "1px solid #075c31",
+                            background: "#e6f4ec",
+                            color: "#075c31",
+                            cursor: "pointer",
+                            fontWeight: 800,
+                          }}
+                        >
+                          Agree and Apply 10% Discount
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: 14,
+                textAlign: "center",
+                fontSize: 11,
+                color: "#7b8794",
+                letterSpacing: "0.02em",
+              }}
+            >
+              Scheduler v1.0.0 - Powered by{" "}
+              <a
+                href="https://www.aquorix.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: "#7b8794",
+                  textDecoration: "none",
+                  fontFamily: '"Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, sans-serif',
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                AQUORIX™
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
