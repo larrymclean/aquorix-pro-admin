@@ -122,6 +122,13 @@ export const NAV_CONFIG: NavGroup[] = [
         requiredPermissions: ['can_view_schedule'],
       },
       {
+        label: 'Calendar',
+        path: '/dashboard/calendar',
+        uiModes: ['pro'],
+        iconKey: 'calendar',
+        requiredPermissions: ['can_view_schedule'],
+      },
+      {
         label: 'Bookings',
         path: '/dashboard/bookings',
         uiModes: ['pro'],

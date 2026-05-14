@@ -450,10 +450,6 @@ function OpsBoardApp() {
   const boardDate = formatBoardDate(data.window.start);
   const syncTime = formatSyncTime(data.generated_at, data.operator.timezone);
 
-  const localRefreshTime = lastRefreshedAt
-    ? lastRefreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    : 'loading';
-
   return (
     <div className="ops-board">
       <DevIdentityBanner me={meData} data={data} />
@@ -476,7 +472,7 @@ function OpsBoardApp() {
 
       <div className="sync">
         <span className="online-dot"></span>
-        <span>LIVE | API SYNC: {syncTime} | LOCAL REFRESH: {localRefreshTime} | AUTO 30s</span>
+        <span>ONLINE | LAST SYNC: {syncTime}</span>
       </div>
 
       <div className="strip">

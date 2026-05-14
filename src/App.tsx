@@ -21,6 +21,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+
 import Onboarding from './pages/Onboarding';
 import SetPassword from './pages/SetPassword';
 
@@ -28,8 +29,9 @@ import RequireAuth from './components/RequireAuth';
 import { SystemHealthLogProvider } from './context/SystemHealthLogContext';
 
 import ProDashboardShell from './features/dashboard/ProDashboardShell';
-import ProDashboardMock from './features/dashboard/ProDashboardMock';
+import OverviewPage from './features/dashboard/pages/OverviewPage';
 import SchedulePage from './features/dashboard/pages/SchedulePage';
+import CalendarPage from './features/dashboard/pages/CalendarPage';
 import BookingsPage from './features/dashboard/pages/BookingsPage';
 import BookingDetailPage from './features/dashboard/pages/BookingDetailPage';
 import CoursesPage from './features/dashboard/pages/CoursesPage';
@@ -94,8 +96,9 @@ function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<ProDashboardMock />} />
+          <Route index element={<OverviewPage />} />
           <Route path="schedule" element={<SchedulePage />} />
+          <Route path="calendar" element={<CalendarPage />} />
           <Route path="bookings" element={<BookingsPage />} />
           <Route path="bookings/:bookingId" element={<BookingDetailPage />} />
           <Route path="courses" element={<CoursesPage />} />
