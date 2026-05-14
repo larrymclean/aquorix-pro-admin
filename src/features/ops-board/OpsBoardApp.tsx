@@ -368,7 +368,7 @@ function OpsBoardApp() {
   const [data, setData] = React.useState<OpsBoardApiResponse | null>(null);
   const [meData, setMeData] = React.useState<DevMeResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [lastRefreshedAt, setLastRefreshedAt] = React.useState<Date | null>(null);
+  const [, setLastRefreshedAt] = React.useState<Date | null>(null);
 
   React.useEffect(() => {
     let isMounted = true;

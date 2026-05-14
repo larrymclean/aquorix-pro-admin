@@ -19,7 +19,7 @@
         operator-local timezone where available, responsive, stable.
 */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -44,6 +44,9 @@ function eventStart(session: DashboardScheduleSession) {
 export default function CalendarPage() {
   const { state } = useDashboardSchedule();
   const scheduleData = (state as any).data as any;
+
+  const [selectedSession, setSelectedSession] =
+    useState<DashboardScheduleSession | null>(null);
 
   const events = useMemo(() => {
     const sessions = Array.isArray(scheduleData?.sessions) ? scheduleData.sessions : [];
@@ -97,13 +100,80 @@ export default function CalendarPage() {
           events={events}
           height="auto"
           eventClick={(info) => {
-            const session = info.event.extendedProps.session as DashboardScheduleSession;
-            window.alert(
-              `${session.site_name || "Session"}\n${session.session_date || ""} ${session.start_time || ""}\nSession details/edit panel coming next.`
-            );
+            const session =
+              info.event.extendedProps.session as DashboardScheduleSession;
+
+            setSelectedSession(session);
           }}
         />
-      </div>
+            </div>
+
+      {selectedSession ? (
+        <div
+          className="aqx-overview-schedule-card"
+          style={{ marginTop: 16 }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <h2 style={{ margin: 0 }}>
+              {selectedSession.site_name || "Session"}
+            </h2>
+
+            <button
+              type="button"
+              onClick={() => setSelectedSession(null)}
+              style={{
+                border: "1px solid rgba(0,0,0,0.12)",
+                borderRadius: 8,
+                padding: "6px 10px",
+                cursor: "pointer",
+                background: "#ffffff",
+              }}
+            >
+              Close
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gap: 8 }}>
+            <div>
+              <strong>Date:</strong>{" "}
+              {selectedSession.session_date || "—"}
+            </div>
+
+            <div>
+              <strong>Start:</strong>{" "}
+              {selectedSession.start_time || "—"}
+            </div>
+
+            <div>
+              <strong>Type:</strong>{" "}
+              {selectedSession.session_type || "—"}
+            </div>
+
+            <div>
+              <strong>Status:</strong>{" "}
+              {selectedSession.ops_status || "—"}
+            </div>
+
+            <div>
+              <strong>Capacity:</strong>{" "}
+              {selectedSession.capacity_consumed ?? 0}/
+              {selectedSession.capacity_total ?? "—"}
+            </div>
+
+            <div>
+              <strong>Remaining:</strong>{" "}
+              {selectedSession.capacity_remaining ?? "—"}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

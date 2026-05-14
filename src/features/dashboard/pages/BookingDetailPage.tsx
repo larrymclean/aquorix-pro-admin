@@ -134,12 +134,6 @@ function labelize(s?: string | null) {
   return String(s).replace(/_/g, " ");
 }
 
-function looksUtcIso(s?: string | null) {
-  if (!s) return false;
-  // Common UTC ISO patterns: ends with 'Z' or includes +HH:MM / -HH:MM
-  return /Z$/.test(s) || /[+-]\d{2}:\d{2}$/.test(s);
-}
-
 function formatIsoForDisplay(s?: string | null) {
   if (!s) return "—";
   const d = new Date(s);
@@ -151,14 +145,6 @@ function formatIsoForDisplay(s?: string | null) {
   const hh = String(d.getHours()).padStart(2, "0");
   const mi = String(d.getMinutes()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
-}
-
-function labelDiveDatetime(s?: string | null) {
-  if (!s) return "—";
-  // If it looks UTC-ish, label it explicitly to avoid “wrong time” confusion.
-  if (looksUtcIso(s)) return `${formatIsoForDisplay(s)} (UTC)`;
-  // Otherwise treat as “local as provided”
-  return `${formatIsoForDisplay(s)} (local)`;
 }
 
 export default function BookingDetailPage() {
